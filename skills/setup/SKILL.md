@@ -76,13 +76,33 @@ target/release/dynamite-memory-cli forget --category _setup-test --key check
 
 All three commands should succeed.
 
-## Step 6: Report status
+## Step 6: Activate MCP server
+
+Now that the build is verified, write the `.mcp.json` file at the plugin root so Claude Code discovers the MCP server on next restart:
+
+```bash
+cat > "${CLAUDE_PLUGIN_ROOT}/.mcp.json" << 'EOF'
+{
+  "mcpServers": {
+    "dynamite-memory": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/target/release/dynamite-memory"
+    }
+  }
+}
+EOF
+```
+
+If `CLAUDE_PLUGIN_ROOT` is not set (e.g. running from the source checkout), write to the repo root instead.
+
+## Step 7: Report status
 
 Tell the user:
 
 1. **Server**: running at `~/.local/share/dynamite/server.sock`, database at `~/.local/share/dynamite/memory.db`
-2. **MCP tools**: `remember`, `recall`, `discover`, `forget` — available via the dynamite-memory MCP server
+2. **MCP tools**: `remember`, `recall`, `discover`, `forget` — available via the dynamite-memory MCP server (active after restarting Claude Code)
 3. **Hooks**: UserPromptSubmit (auto-retrieval) and PreCompact (auto-save) configured
 4. **CLI**: `target/release/dynamite-memory-cli` for direct access
+
+Tell the user to **restart Claude Code** for the MCP server to be picked up.
 
 If an `ANTHROPIC_API_KEY` is set, the hooks will use Claude Haiku for intelligent memory selection and extraction. Otherwise they fall back to fetching all memories.

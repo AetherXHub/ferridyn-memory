@@ -1,6 +1,5 @@
 {
   "name": "dynamite-memory",
   "version": "0.1.0",
-  "description": "Agentic memory system backed by DynaMite. Automatically recalls relevant context and persists learnings across sessions.",
-  "mcpServers": "./.mcp.json"
+  "description": "Agentic memory system backed by DynaMite. Automatically recalls relevant context and persists learnings across sessions."
 }
