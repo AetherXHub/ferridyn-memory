@@ -1,0 +1,53 @@
+use std::sync::Arc;
+
+use rmcp::ServiceExt;
+use rmcp::transport::stdio;
+use tokio::sync::Mutex;
+
+use dynamite_memory::backend::MemoryBackend;
+use dynamite_memory::{
+    ensure_memories_table_via_server, init_db_direct, resolve_db_path, resolve_socket_path,
+};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .init();
+
+    let backend = connect_backend().await?;
+
+    let server = dynamite_memory::server::MemoryServer::new(backend);
+    let service = server.serve(stdio()).await?;
+    service.waiting().await?;
+
+    Ok(())
+}
+
+/// Try to connect to the dynamite-server socket. If it's not available,
+/// fall back to opening the database directly.
+async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> {
+    let socket_path = resolve_socket_path();
+
+    // Try server connection first.
+    if socket_path.exists() {
+        match dynamite_server::DynaMiteClient::connect(&socket_path).await {
+            Ok(mut client) => {
+                // Ensure the memories table exists on the server.
+                ensure_memories_table_via_server(&mut client).await?;
+                return Ok(MemoryBackend::Server(Arc::new(Mutex::new(client))));
+            }
+            Err(e) => {
+                eprintln!(
+                    "warning: server socket exists but connection failed ({e}), falling back to direct"
+                );
+            }
+        }
+    }
+
+    // Fallback: open database directly.
+    let db_path = resolve_db_path();
+    let db = init_db_direct(&db_path)?;
+    Ok(MemoryBackend::Direct(db))
+}
