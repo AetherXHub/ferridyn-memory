@@ -1,6 +1,6 @@
 ---
 name: forget
-description: Remove a specific memory from the DynamiteDB memory system. Use when information is outdated, incorrect, or explicitly requested to be removed.
+description: Remove a specific memory from the FerridynDB memory system. Use when information is outdated, incorrect, or explicitly requested to be removed.
 ---
 
 # Forget — Remove a Memory

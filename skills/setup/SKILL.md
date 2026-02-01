@@ -1,18 +1,18 @@
 ---
 name: setup
-description: Build and configure the DynamiteDB memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
+description: Build and configure the FerridynDB memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
 ---
 
-# DynamiteDB Memory Setup
+# FerridynDB Memory Setup
 
-This is the setup command for the DynamiteDB memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
+This is the setup command for the FerridynDB memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
 
 ## Graceful Interrupt Handling
 
 **IMPORTANT**: This setup process saves progress after each step. If interrupted, setup can resume from where it left off.
 
 ### State File Location
-- `.omc/state/dynamite-setup-state.json` - Tracks completed steps
+- `.omc/state/ferridyn-setup-state.json` - Tracks completed steps
 
 ### Resume Detection (Step 0)
 
@@ -21,7 +21,7 @@ Before starting any step, check for existing state:
 ```bash
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 STATE_DIR="${PLUGIN_ROOT}/.omc/state"
-STATE_FILE="${STATE_DIR}/dynamite-setup-state.json"
+STATE_FILE="${STATE_DIR}/ferridyn-setup-state.json"
 
 if [ -f "$STATE_FILE" ]; then
   LAST_STEP=$(jq -r ".lastCompletedStep // 0" "$STATE_FILE" 2>/dev/null || echo "0")
@@ -87,11 +87,11 @@ command -v jq >/dev/null 2>&1 && echo "jq: OK" || echo "jq: MISSING (optional, u
 
 If `cargo` is missing, stop and tell the user:
 
-> **DynamiteDB is written in Rust.** Install the Rust toolchain first:
+> **FerridynDB is written in Rust.** Install the Rust toolchain first:
 > ```
 > curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 > ```
-> Then re-run `/dynamite-memory:setup`.
+> Then re-run `/ferridyn-memory:setup`.
 
 If `ANTHROPIC_API_KEY` is missing, warn the user:
 
@@ -126,18 +126,18 @@ cargo build --release
 
 If the build fails, stop and report the error. Do not continue.
 
-Install the DynamiteDB server binary from the database repo:
+Install the FerridynDB server binary from the database repo:
 
 ```bash
-cargo install dynamite-server --git https://github.com/AetherXHub/dynamitedb
+cargo install ferridyn-server --git https://github.com/AetherXHub/ferridyndb
 ```
 
 Confirm the binaries exist:
 
 ```bash
-ls -l "$PLUGIN_ROOT/target/release/dynamite-memory" \
-      "$PLUGIN_ROOT/target/release/dynamite-memory-cli"
-command -v dynamite-server >/dev/null 2>&1 && echo "dynamite-server: OK" || echo "dynamite-server: MISSING"
+ls -l "$PLUGIN_ROOT/target/release/ferridyn-memory" \
+      "$PLUGIN_ROOT/target/release/ferridyn-memory-cli"
+command -v ferridyn-server >/dev/null 2>&1 && echo "ferridyn-server: OK" || echo "ferridyn-server: MISSING"
 ```
 
 All three must be present. Save progress:
@@ -148,20 +148,20 @@ save_setup_progress 2
 ## Step 3: Create Data Directory and Start Server
 
 ```bash
-mkdir -p ~/.local/share/dynamite
+mkdir -p ~/.local/share/ferridyn
 ```
 
 Check if the server is already running:
 
 ```bash
-if [ -S ~/.local/share/dynamite/server.sock ]; then
+if [ -S ~/.local/share/ferridyn/server.sock ]; then
   # Socket exists — test if server is responsive
-  timeout 2 "$PLUGIN_ROOT/target/release/dynamite-memory-cli" discover >/dev/null 2>&1
+  timeout 2 "$PLUGIN_ROOT/target/release/ferridyn-memory-cli" discover >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "Server already running and responsive."
   else
     echo "Stale socket found. Restarting server..."
-    rm -f ~/.local/share/dynamite/server.sock
+    rm -f ~/.local/share/ferridyn/server.sock
   fi
 else
   echo "No server running. Starting..."
@@ -171,14 +171,14 @@ fi
 If the server is not running (socket missing or stale), start it:
 
 ```bash
-nohup dynamite-server \
-  --db ~/.local/share/dynamite/memory.db \
-  --socket ~/.local/share/dynamite/server.sock \
+nohup ferridyn-server \
+  --db ~/.local/share/ferridyn/memory.db \
+  --socket ~/.local/share/ferridyn/server.sock \
   > /dev/null 2>&1 &
 
 # Wait for socket to appear (up to 3 seconds)
 for i in 1 2 3; do
-  [ -S ~/.local/share/dynamite/server.sock ] && break
+  [ -S ~/.local/share/ferridyn/server.sock ] && break
   sleep 1
 done
 ```
@@ -186,7 +186,7 @@ done
 Verify the socket was created:
 
 ```bash
-[ -S ~/.local/share/dynamite/server.sock ] && echo "Server started." || echo "ERROR: Server failed to start."
+[ -S ~/.local/share/ferridyn/server.sock ] && echo "Server started." || echo "ERROR: Server failed to start."
 ```
 
 If the server failed to start, stop and report. Save progress:
@@ -199,9 +199,9 @@ save_setup_progress 3
 Test store, recall, and cleanup:
 
 ```bash
-"$PLUGIN_ROOT/target/release/dynamite-memory-cli" remember --category _setup-test --key check --content "Setup verification"
-"$PLUGIN_ROOT/target/release/dynamite-memory-cli" recall --category _setup-test
-"$PLUGIN_ROOT/target/release/dynamite-memory-cli" forget --category _setup-test --key check
+"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" remember --category _setup-test --key check --content "Setup verification"
+"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" recall --category _setup-test
+"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" forget --category _setup-test --key check
 ```
 
 All three commands must succeed. If any fails, stop and report. Save progress:
@@ -217,8 +217,8 @@ Write the `.mcp.json` file at the plugin root so Claude Code discovers the MCP s
 cat > "${PLUGIN_ROOT}/.mcp.json" << 'EOF'
 {
   "mcpServers": {
-    "dynamite-memory": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/target/release/dynamite-memory",
+    "ferridyn-memory": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/target/release/ferridyn-memory",
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
       }
@@ -245,11 +245,11 @@ rm -f "$STATE_FILE"
 Display the following:
 
 ```
-DynamiteDB Memory Setup Complete!
+FerridynDB Memory Setup Complete!
 
 SERVER
-  Socket:   ~/.local/share/dynamite/server.sock
-  Database: ~/.local/share/dynamite/memory.db
+  Socket:   ~/.local/share/ferridyn/server.sock
+  Database: ~/.local/share/ferridyn/memory.db
 
 MCP TOOLS (available after restarting Claude Code)
   remember  - Store a memory (auto-infers schema on first write)
@@ -259,18 +259,18 @@ MCP TOOLS (available after restarting Claude Code)
   define    - Explicitly define a category's key schema
 
 SKILLS (slash commands)
-  /dynamite-memory:remember  - Guidance on what and how to store
-  /dynamite-memory:recall    - Precise and natural language retrieval
-  /dynamite-memory:forget    - Safe memory removal workflow
-  /dynamite-memory:browse    - Interactive memory exploration
-  /dynamite-memory:learn     - Deep codebase exploration → persistent memory
+  /ferridyn-memory:remember  - Guidance on what and how to store
+  /ferridyn-memory:recall    - Precise and natural language retrieval
+  /ferridyn-memory:forget    - Safe memory removal workflow
+  /ferridyn-memory:browse    - Interactive memory exploration
+  /ferridyn-memory:learn     - Deep codebase exploration → persistent memory
 
 HOOKS
   UserPromptSubmit - Automatically recalls relevant memories before each prompt
   PreCompact       - Saves important learnings before conversation compaction
 
 CLI (direct access)
-  $PLUGIN_ROOT/target/release/dynamite-memory-cli
+  $PLUGIN_ROOT/target/release/ferridyn-memory-cli
 
 NEXT STEP
   Restart Claude Code for the MCP server and hooks to take effect.
@@ -282,20 +282,20 @@ If `ANTHROPIC_API_KEY` is set in the environment, add:
 
 ## Help Text
 
-When user runs `/dynamite-memory:setup --help`, display:
+When user runs `/ferridyn-memory:setup --help`, display:
 
 ```
-DynamiteDB Memory Setup
+FerridynDB Memory Setup
 
 USAGE:
-  /dynamite-memory:setup         Run full setup (build, server, MCP activation)
-  /dynamite-memory:setup --help  Show this help
+  /ferridyn-memory:setup         Run full setup (build, server, MCP activation)
+  /ferridyn-memory:setup --help  Show this help
 
 WHAT IT DOES:
   1. Checks for Rust toolchain (cargo) and ANTHROPIC_API_KEY
-  2. Builds plugin binaries and installs dynamite-server from dynamitedb repo
-  3. Creates data directory (~/.local/share/dynamite)
-  4. Starts the DynamiteDB server daemon
+  2. Builds plugin binaries and installs ferridyn-server from ferridyndb repo
+  3. Creates data directory (~/.local/share/ferridyn)
+  4. Starts the FerridynDB server daemon
   5. Verifies round-trip memory storage
   6. Writes .mcp.json to activate MCP tools (with API key passthrough)
 
@@ -306,5 +306,5 @@ PREREQUISITES:
 AFTER SETUP:
   Restart Claude Code for MCP tools and hooks to activate.
 
-For more info: https://github.com/AetherXHub/dynamite-memory
+For more info: https://github.com/AetherXHub/ferridyn-memory
 ```

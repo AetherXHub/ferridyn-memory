@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Retrieve memories from the DynamiteDB memory system. Supports precise category+prefix lookups and natural language queries.
+description: Retrieve memories from the FerridynDB memory system. Supports precise category+prefix lookups and natural language queries.
 ---
 
 # Recall — Retrieve Memories

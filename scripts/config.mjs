@@ -1,4 +1,4 @@
-// Shared utilities for DynamiteDB memory hooks.
+// Shared utilities for FerridynDB memory hooks.
 // Zero npm dependencies — Node.js built-ins only.
 
 import { execFile } from "node:child_process";
@@ -14,15 +14,15 @@ const PLUGIN_ROOT = resolve(import.meta.dirname, "..");
 
 // CLI binary: env var override, or resolve relative to plugin root (repo root).
 const CLI_BIN =
-  process.env.DYNAMITE_MEMORY_CLI ||
-  resolve(PLUGIN_ROOT, "target", "release", "dynamite-memory-cli");
+  process.env.FERRIDYN_MEMORY_CLI ||
+  resolve(PLUGIN_ROOT, "target", "release", "ferridyn-memory-cli");
 
 // ---------------------------------------------------------------------------
 // CLI runner
 // ---------------------------------------------------------------------------
 
 /**
- * Run dynamite-memory-cli with the given arguments.
+ * Run ferridyn-memory-cli with the given arguments.
  * Returns parsed JSON from stdout.
  */
 export function runCli(args, { timeout = 10_000 } = {}) {

@@ -4,10 +4,10 @@ use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 use tokio::sync::Mutex;
 
-use dynamite_memory::backend::MemoryBackend;
-use dynamite_memory::llm::AnthropicClient;
-use dynamite_memory::schema::SchemaStore;
-use dynamite_memory::{
+use ferridyn_memory::backend::MemoryBackend;
+use ferridyn_memory::llm::AnthropicClient;
+use ferridyn_memory::schema::SchemaStore;
+use ferridyn_memory::{
     ensure_memories_table_via_server, init_db_direct, resolve_db_path, resolve_socket_path,
 };
 
@@ -28,21 +28,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = connect_backend().await?;
     let schema_store = SchemaStore::new(backend.clone());
 
-    let server = dynamite_memory::server::MemoryServer::new(backend, schema_store, Arc::new(llm));
+    let server = ferridyn_memory::server::MemoryServer::new(backend, schema_store, Arc::new(llm));
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
 
     Ok(())
 }
 
-/// Try to connect to the dynamite-server socket. If it's not available,
+/// Try to connect to the ferridyn-server socket. If it's not available,
 /// fall back to opening the database directly.
 async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> {
     let socket_path = resolve_socket_path();
 
     // Try server connection first.
     if socket_path.exists() {
-        match dynamite_server::DynamiteClient::connect(&socket_path).await {
+        match ferridyn_server::FerridynClient::connect(&socket_path).await {
             Ok(mut client) => {
                 // Ensure the memories table exists on the server.
                 ensure_memories_table_via_server(&mut client).await?;

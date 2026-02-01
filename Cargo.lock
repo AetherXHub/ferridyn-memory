@@ -278,59 +278,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "dynamite-core"
-version = "0.1.0"
-source = "git+https://github.com/AetherXHub/dynamitedb#e26e86aba70ec7d3b02274c508dc64977be77302"
-dependencies = [
- "bytes",
- "fs2",
- "parking_lot",
- "rmp-serde",
- "serde",
- "serde_json",
- "thiserror",
- "xxhash-rust",
-]
-
-[[package]]
-name = "dynamite-memory"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "clap",
- "dirs",
- "dynamite-core",
- "dynamite-server",
- "indexmap",
- "regex",
- "reqwest",
- "rmcp",
- "schemars",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "dynamite-server"
-version = "0.1.0"
-source = "git+https://github.com/AetherXHub/dynamitedb#e26e86aba70ec7d3b02274c508dc64977be77302"
-dependencies = [
- "dirs",
- "dynamite-core",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,6 +298,59 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "ferridyn-core"
+version = "0.1.0"
+source = "git+https://github.com/AetherXHub/ferridyndb#3980ab5b22204d20a436731c930a6795e312e1cb"
+dependencies = [
+ "bytes",
+ "fs2",
+ "parking_lot",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "ferridyn-memory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "dirs",
+ "ferridyn-core",
+ "ferridyn-server",
+ "indexmap",
+ "regex",
+ "reqwest",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ferridyn-server"
+version = "0.1.0"
+source = "git+https://github.com/AetherXHub/ferridyndb#3980ab5b22204d20a436731c930a6795e312e1cb"
+dependencies = [
+ "dirs",
+ "ferridyn-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "find-msvc-tools"
@@ -2257,6 +2257,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1966f8ac2c1f76987d69a74d0e0f929241c10e78136434e3be70ff7f58f64214"
+checksum = "3ff05f8caa9038894637571ae6b9e29466c1f4f829d26c9b28f869a29cbe3445"

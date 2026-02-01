@@ -1,4 +1,4 @@
-//! DynamiteDB Memory — shared library for MCP server and CLI.
+//! FerridynDB Memory — shared library for MCP server and CLI.
 
 pub mod backend;
 pub mod error;
@@ -13,36 +13,36 @@ pub const TABLE_NAME: &str = "memories";
 
 /// Resolve the socket path from env var or default location.
 pub fn resolve_socket_path() -> PathBuf {
-    if let Ok(path) = std::env::var("DYNAMITE_MEMORY_SOCKET") {
+    if let Ok(path) = std::env::var("FERRIDYN_MEMORY_SOCKET") {
         return PathBuf::from(path);
     }
 
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    data_dir.join("dynamite").join("server.sock")
+    data_dir.join("ferridyn").join("server.sock")
 }
 
 /// Resolve the database path from env var or default location.
 pub fn resolve_db_path() -> PathBuf {
-    if let Ok(path) = std::env::var("DYNAMITE_MEMORY_DB") {
+    if let Ok(path) = std::env::var("FERRIDYN_MEMORY_DB") {
         return PathBuf::from(path);
     }
 
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
-    data_dir.join("dynamite").join("memory.db")
+    data_dir.join("ferridyn").join("memory.db")
 }
 
 /// Open or create the database directly and ensure the memories table exists.
 pub fn init_db_direct(
     path: &std::path::Path,
-) -> Result<dynamite_core::api::DynamiteDB, Box<dyn std::error::Error>> {
+) -> Result<ferridyn_core::api::FerridynDB, Box<dyn std::error::Error>> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
     let db = if path.exists() {
-        dynamite_core::api::DynamiteDB::open(path)?
+        ferridyn_core::api::FerridynDB::open(path)?
     } else {
-        dynamite_core::api::DynamiteDB::create(path)?
+        ferridyn_core::api::FerridynDB::create(path)?
     };
 
     ensure_memories_table_direct(&db)?;
@@ -51,9 +51,9 @@ pub fn init_db_direct(
 
 /// Create the memories table if it doesn't already exist (direct DB access).
 fn ensure_memories_table_direct(
-    db: &dynamite_core::api::DynamiteDB,
-) -> Result<(), dynamite_core::error::Error> {
-    use dynamite_core::types::KeyType;
+    db: &ferridyn_core::api::FerridynDB,
+) -> Result<(), ferridyn_core::error::Error> {
+    use ferridyn_core::types::KeyType;
 
     match db
         .create_table(TABLE_NAME)
@@ -62,8 +62,8 @@ fn ensure_memories_table_direct(
         .execute()
     {
         Ok(()) => Ok(()),
-        Err(dynamite_core::error::Error::Schema(
-            dynamite_core::error::SchemaError::TableAlreadyExists(_),
+        Err(ferridyn_core::error::Error::Schema(
+            ferridyn_core::error::SchemaError::TableAlreadyExists(_),
         )) => Ok(()),
         Err(e) => Err(e),
     }
@@ -71,9 +71,9 @@ fn ensure_memories_table_direct(
 
 /// Ensure the memories table exists via a server client.
 pub async fn ensure_memories_table_via_server(
-    client: &mut dynamite_server::DynamiteClient,
-) -> Result<(), dynamite_server::error::ClientError> {
-    use dynamite_server::protocol::KeyDef;
+    client: &mut ferridyn_server::FerridynClient,
+) -> Result<(), ferridyn_server::error::ClientError> {
+    use ferridyn_server::protocol::KeyDef;
 
     match client
         .create_table(
@@ -91,7 +91,7 @@ pub async fn ensure_memories_table_via_server(
         .await
     {
         Ok(()) => Ok(()),
-        Err(dynamite_server::error::ClientError::Server(ref e))
+        Err(ferridyn_server::error::ClientError::Server(ref e))
             if e.error == "TableAlreadyExists" =>
         {
             Ok(())

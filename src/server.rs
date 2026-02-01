@@ -364,7 +364,7 @@ impl ServerHandler for MemoryServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Agentic memory server backed by DynamiteDB. Use 'remember' to store, \
+                "Agentic memory server backed by FerridynDB. Use 'remember' to store, \
                  'recall' to retrieve (supports natural language queries), 'forget' to delete, \
                  'discover' to browse memory categories and structure, and 'define' to set \
                  category schemas."
@@ -380,13 +380,13 @@ impl ServerHandler for MemoryServer {
 mod tests {
     use super::*;
     use crate::llm::MockLlmClient;
-    use dynamite_core::api::DynamiteDB;
-    use dynamite_core::types::KeyType;
+    use ferridyn_core::api::FerridynDB;
+    use ferridyn_core::types::KeyType;
     use serde_json::json;
 
-    fn setup_test_db() -> (DynamiteDB, tempfile::TempDir) {
+    fn setup_test_db() -> (FerridynDB, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let db = DynamiteDB::create(dir.path().join("test.db")).unwrap();
+        let db = FerridynDB::create(dir.path().join("test.db")).unwrap();
         db.create_table("memories")
             .partition_key("category", KeyType::String)
             .sort_key("key", KeyType::String)
@@ -395,7 +395,7 @@ mod tests {
         (db, dir)
     }
 
-    fn setup_server(db: DynamiteDB, mock_responses: Vec<String>) -> MemoryServer {
+    fn setup_server(db: FerridynDB, mock_responses: Vec<String>) -> MemoryServer {
         let backend = MemoryBackend::Direct(db);
         let schema_store = SchemaStore::new(backend.clone());
         let llm: Arc<dyn LlmClient> = Arc::new(MockLlmClient::new(mock_responses));

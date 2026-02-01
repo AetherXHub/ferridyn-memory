@@ -1,4 +1,4 @@
-//! Backend abstraction: direct DynamiteDB handle or server client.
+//! Backend abstraction: direct FerridynDB handle or server client.
 
 use std::sync::Arc;
 
@@ -6,19 +6,19 @@ use rmcp::ErrorData;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use dynamite_core::api::DynamiteDB;
-use dynamite_server::DynamiteClient;
+use ferridyn_core::api::FerridynDB;
+use ferridyn_server::FerridynClient;
 
 use crate::TABLE_NAME;
 
 /// Unified backend for memory operations.
 ///
-/// `Direct` uses an in-process DynamiteDB handle (exclusive file lock).
-/// `Server` uses a DynamiteClient connected to a running `dynamite-server`.
+/// `Direct` uses an in-process FerridynDB handle (exclusive file lock).
+/// `Server` uses a FerridynClient connected to a running `ferridyn-server`.
 #[derive(Clone)]
 pub enum MemoryBackend {
-    Direct(DynamiteDB),
-    Server(Arc<Mutex<DynamiteClient>>),
+    Direct(FerridynDB),
+    Server(Arc<Mutex<FerridynClient>>),
 }
 
 impl MemoryBackend {
@@ -71,7 +71,7 @@ impl MemoryBackend {
                 Ok(result.items)
             }
             Self::Server(client) => {
-                use dynamite_server::protocol::SortKeyCondition;
+                use ferridyn_server::protocol::SortKeyCondition;
                 let cond = prefix.map(|pfx| SortKeyCondition::BeginsWith {
                     prefix: pfx.to_string(),
                 });
@@ -156,10 +156,10 @@ impl MemoryBackend {
     }
 }
 
-fn mcp_core_err(err: dynamite_core::error::Error) -> ErrorData {
+fn mcp_core_err(err: ferridyn_core::error::Error) -> ErrorData {
     ErrorData::internal_error(format!("Database error: {err}"), None)
 }
 
-fn mcp_client_err(err: dynamite_server::error::ClientError) -> ErrorData {
+fn mcp_client_err(err: ferridyn_server::error::ClientError) -> ErrorData {
     ErrorData::internal_error(format!("Server error: {err}"), None)
 }

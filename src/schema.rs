@@ -516,12 +516,12 @@ mod tests {
     // --- SchemaStore with tempdb ---
 
     use crate::backend::MemoryBackend;
-    use dynamite_core::api::DynamiteDB;
-    use dynamite_core::types::KeyType;
+    use ferridyn_core::api::FerridynDB;
+    use ferridyn_core::types::KeyType;
 
     fn setup_store() -> (SchemaStore, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let db = DynamiteDB::create(dir.path().join("test.db")).unwrap();
+        let db = FerridynDB::create(dir.path().join("test.db")).unwrap();
         db.create_table("memories")
             .partition_key("category", KeyType::String)
             .sort_key("key", KeyType::String)

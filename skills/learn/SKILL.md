@@ -1,11 +1,11 @@
 ---
 name: learn
-description: Deep codebase exploration that builds persistent project memory. Like /init but stores findings in DynamiteDB for cross-session recall.
+description: Deep codebase exploration that builds persistent project memory. Like /init but stores findings in FerridynDB for cross-session recall.
 ---
 
 # Learn — Build Project Memory
 
-Explore the codebase deeply and store structured findings as persistent memories. This is the DynamiteDB equivalent of `/init` — but instead of writing a one-time CLAUDE.md, it builds incrementally updatable project knowledge.
+Explore the codebase deeply and store structured findings as persistent memories. This is the FerridynDB equivalent of `/init` — but instead of writing a one-time CLAUDE.md, it builds incrementally updatable project knowledge.
 
 ## Schema
 

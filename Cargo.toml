@@ -1,23 +1,23 @@
 [package]
-name = "dynamite-memory"
+name = "ferridyn-memory"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "dynamite_memory"
+name = "ferridyn_memory"
 path = "src/lib.rs"
 
 [[bin]]
-name = "dynamite-memory"
+name = "ferridyn-memory"
 path = "src/main.rs"
 
 [[bin]]
-name = "dynamite-memory-cli"
+name = "ferridyn-memory-cli"
 path = "src/cli.rs"
 
 [dependencies]
-dynamite-core = { git = "https://github.com/AetherXHub/dynamitedb" }
-dynamite-server = { git = "https://github.com/AetherXHub/dynamitedb" }
+ferridyn-core = { git = "https://github.com/AetherXHub/ferridyndb" }
+ferridyn-server = { git = "https://github.com/AetherXHub/ferridyndb" }
 rmcp = { version = "0.14", features = ["server", "transport-io"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

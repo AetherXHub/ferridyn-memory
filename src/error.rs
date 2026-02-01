@@ -1,1 +1,1 @@
-//! Error types for the dynamite-memory crate.
+//! Error types for the ferridyn-memory crate.

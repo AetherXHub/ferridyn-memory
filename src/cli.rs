@@ -3,17 +3,17 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use tokio::sync::Mutex;
 
-use dynamite_memory::backend::MemoryBackend;
-use dynamite_memory::llm::{AnthropicClient, LlmClient};
-use dynamite_memory::schema::{SchemaStore, resolve_query};
-use dynamite_memory::{
+use ferridyn_memory::backend::MemoryBackend;
+use ferridyn_memory::llm::{AnthropicClient, LlmClient};
+use ferridyn_memory::schema::{SchemaStore, resolve_query};
+use ferridyn_memory::{
     ensure_memories_table_via_server, init_db_direct, resolve_db_path, resolve_socket_path,
 };
 
 #[derive(Parser)]
 #[command(
-    name = "dynamite-memory-cli",
-    about = "CLI for DynamiteDB memory operations"
+    name = "ferridyn-memory-cli",
+    about = "CLI for FerridynDB memory operations"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -172,14 +172,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .filter(|s| !s.is_empty())
                 .collect();
 
-            let schema = dynamite_memory::schema::CategorySchema {
+            let schema = ferridyn_memory::schema::CategorySchema {
                 description,
                 sort_key_format,
                 segments: segments_map,
                 examples: examples_vec,
             };
 
-            dynamite_memory::schema::validate_schema_format(&schema)
+            ferridyn_memory::schema::validate_schema_format(&schema)
                 .map_err(|e| format!("Invalid schema: {e}"))?;
 
             schema_store
@@ -224,13 +224,13 @@ fn require_llm() -> Result<Arc<dyn LlmClient>, String> {
     Ok(Arc::new(client))
 }
 
-/// Try to connect to the dynamite-server socket. If it's not available,
+/// Try to connect to the ferridyn-server socket. If it's not available,
 /// fall back to opening the database directly.
 async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> {
     let socket_path = resolve_socket_path();
 
     if socket_path.exists() {
-        match dynamite_server::DynamiteClient::connect(&socket_path).await {
+        match ferridyn_server::FerridynClient::connect(&socket_path).await {
             Ok(mut client) => {
                 ensure_memories_table_via_server(&mut client).await?;
                 return Ok(MemoryBackend::Server(Arc::new(Mutex::new(client))));

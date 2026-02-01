@@ -1,6 +1,6 @@
 ---
 name: remember
-description: Store a memory using the DynamiteDB memory system. Guides the agent on what to store, how to choose categories and keys, and when NOT to store.
+description: Store a memory using the FerridynDB memory system. Guides the agent on what to store, how to choose categories and keys, and when NOT to store.
 ---
 
 # Remember — Store a Memory

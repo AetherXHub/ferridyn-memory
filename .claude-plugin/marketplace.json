@@ -1,15 +1,15 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "dynamite-memory",
-  "description": "Agentic memory plugin for Claude Code backed by DynamiteDB",
+  "name": "ferridyn-memory",
+  "description": "Agentic memory plugin for Claude Code backed by FerridynDB",
   "owner": {
     "name": "Travis Stanley",
     "email": "travis@foxworks.dev"
   },
   "plugins": [
     {
-      "name": "dynamite-memory",
-      "description": "Agentic memory system backed by DynamiteDB. Automatically recalls relevant context and persists learnings across sessions.",
+      "name": "ferridyn-memory",
+      "description": "Agentic memory system backed by FerridynDB. Automatically recalls relevant context and persists learnings across sessions.",
       "version": "0.1.0",
       "author": {
         "name": "Travis Stanley",
@@ -17,7 +17,7 @@
       },
       "source": "./",
       "category": "memory",
-      "homepage": "https://github.com/AetherXHub/dynamite-memory",
+      "homepage": "https://github.com/AetherXHub/ferridyn-memory",
       "tags": ["memory", "agentic-memory", "dynamodb", "embedded-database"]
     }
   ]

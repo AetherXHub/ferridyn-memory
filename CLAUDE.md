@@ -2,11 +2,11 @@
 
 ## Project
 
-DynamiteDB Memory is a Claude Code plugin providing agentic memory backed by the DynamiteDB embedded database. It stores and retrieves memories via an MCP server, with automatic context retrieval and learning hooks.
+FerridynDB Memory is a Claude Code plugin providing agentic memory backed by the FerridynDB embedded database. It stores and retrieves memories via an MCP server, with automatic context retrieval and learning hooks.
 
 ## Build Commands
 
-- `cargo build` — compile the plugin (dynamite-memory MCP server + dynamite-memory-cli)
+- `cargo build` — compile the plugin (ferridyn-memory MCP server + ferridyn-memory-cli)
 - `cargo build --release` — release build
 - `cargo test` — run all tests
 - `cargo clippy -- -D warnings` — lint
@@ -14,9 +14,9 @@ DynamiteDB Memory is a Claude Code plugin providing agentic memory backed by the
 
 ## Dependencies
 
-The plugin depends on `dynamite-core` and `dynamite-server` from the [dynamitedb](https://github.com/AetherXHub/dynamitedb) repository via git dependencies.
+The plugin depends on `ferridyn-core` and `ferridyn-server` from the [ferridyndb](https://github.com/AetherXHub/ferridyndb) repository via git dependencies.
 
-For local development against a local dynamitedb checkout, uncomment the `[patch]` section in `.cargo/config.toml`.
+For local development against a local ferridyndb checkout, uncomment the `[patch]` section in `.cargo/config.toml`.
 
 ## Architecture
 
