@@ -5,6 +5,8 @@ use rmcp::transport::stdio;
 use tokio::sync::Mutex;
 
 use dynamite_memory::backend::MemoryBackend;
+use dynamite_memory::llm::AnthropicClient;
+use dynamite_memory::schema::SchemaStore;
 use dynamite_memory::{
     ensure_memories_table_via_server, init_db_direct, resolve_db_path, resolve_socket_path,
 };
@@ -16,9 +18,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_writer(std::io::stderr)
         .init();
 
-    let backend = connect_backend().await?;
+    // LLM client is required — fail early if missing.
+    let llm = AnthropicClient::from_env().map_err(|e| {
+        format!(
+            "{e}. Set ANTHROPIC_API_KEY to enable schema inference and natural language recall."
+        )
+    })?;
 
-    let server = dynamite_memory::server::MemoryServer::new(backend);
+    let backend = connect_backend().await?;
+    let schema_store = SchemaStore::new(backend.clone());
+
+    let server = dynamite_memory::server::MemoryServer::new(backend, schema_store, Arc::new(llm));
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
 

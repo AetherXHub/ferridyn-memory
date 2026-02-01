@@ -2,6 +2,8 @@
 
 pub mod backend;
 pub mod error;
+pub mod llm;
+pub mod schema;
 pub mod server;
 
 use std::path::PathBuf;

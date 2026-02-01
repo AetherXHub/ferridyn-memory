@@ -1,0 +1,5 @@
+---
+description: Interactively explore the DynaMite memory structure — categories, schemas, and entries
+---
+
+Run the browse skill: follow all instructions in `skills/browse/SKILL.md`.

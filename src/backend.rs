@@ -34,6 +34,27 @@ impl MemoryBackend {
         }
     }
 
+    pub async fn get_item(&self, category: &str, key: &str) -> Result<Option<Value>, ErrorData> {
+        match self {
+            Self::Direct(db) => db
+                .get_item(TABLE_NAME)
+                .partition_key(category)
+                .sort_key(key)
+                .execute()
+                .map_err(mcp_core_err),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .get_item(
+                    TABLE_NAME,
+                    Value::String(category.to_string()),
+                    Some(Value::String(key.to_string())),
+                )
+                .await
+                .map_err(mcp_client_err),
+        }
+    }
+
     pub async fn query(
         &self,
         partition_key: &str,
