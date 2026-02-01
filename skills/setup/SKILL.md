@@ -1,87 +1,196 @@
 ---
 name: setup
 description: Build and configure the DynaMite memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
-user-invocable: true
 ---
 
 # DynaMite Memory Setup
 
-You are setting up the DynaMite memory system. Follow each step in order. If a step fails, report the error and stop.
+This is the setup command for the DynaMite memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
 
-## Step 1: Build release binaries
+## Graceful Interrupt Handling
 
-Run from the project root:
+**IMPORTANT**: This setup process saves progress after each step. If interrupted, setup can resume from where it left off.
+
+### State File Location
+- `.omc/state/dynamite-setup-state.json` - Tracks completed steps
+
+### Resume Detection (Step 0)
+
+Before starting any step, check for existing state:
 
 ```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
+STATE_DIR="${PLUGIN_ROOT}/.omc/state"
+STATE_FILE="${STATE_DIR}/dynamite-setup-state.json"
+
+if [ -f "$STATE_FILE" ]; then
+  LAST_STEP=$(jq -r ".lastCompletedStep // 0" "$STATE_FILE" 2>/dev/null || echo "0")
+  TIMESTAMP=$(jq -r .timestamp "$STATE_FILE" 2>/dev/null || echo "unknown")
+
+  # Check if state is stale (older than 24 hours)
+  TIMESTAMP_RAW=$(jq -r '.timestamp // empty' "$STATE_FILE" 2>/dev/null)
+  if [ -n "$TIMESTAMP_RAW" ]; then
+    NOW_EPOCH=$(date +%s)
+    TS_EPOCH=$(date -d "$TIMESTAMP_RAW" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$(echo "$TIMESTAMP_RAW" | cut -dT -f1-2 | sed 's/+.*//')" +%s 2>/dev/null || echo "0")
+    STATE_AGE=$((NOW_EPOCH - TS_EPOCH))
+  else
+    STATE_AGE=999999
+  fi
+
+  if [ "$STATE_AGE" -gt 86400 ]; then
+    echo "Previous setup state is more than 24 hours old. Starting fresh."
+    rm -f "$STATE_FILE"
+  else
+    echo "Found previous setup session (Step $LAST_STEP completed at $TIMESTAMP)"
+  fi
+fi
+```
+
+If state exists and is fresh, use AskUserQuestion to prompt:
+
+**Question:** "Found a previous setup session. Resume or start fresh?"
+
+**Options:**
+1. **Resume from step $LAST_STEP** - Continue where you left off
+2. **Start fresh** - Begin from the beginning
+
+If user chooses "Start fresh":
+```bash
+rm -f "$STATE_FILE"
+```
+
+### Save Progress Helper
+
+After completing each major step, save progress:
+
+```bash
+save_setup_progress() {
+  mkdir -p "$STATE_DIR"
+  cat > "$STATE_FILE" << EOF
+{
+  "lastCompletedStep": $1,
+  "timestamp": "$(date -Iseconds)"
+}
+EOF
+}
+```
+
+## Step 1: Check Prerequisites
+
+Verify the toolchain is available before attempting anything:
+
+```bash
+command -v cargo >/dev/null 2>&1 && echo "cargo: OK" || echo "cargo: MISSING"
+command -v jq >/dev/null 2>&1 && echo "jq: OK" || echo "jq: MISSING (optional, used for state tracking)"
+```
+
+If `cargo` is missing, stop and tell the user:
+
+> **DynaMite is written in Rust.** Install the Rust toolchain first:
+> ```
+> curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+> ```
+> Then re-run `/dynamite-memory:setup`.
+
+Save progress after prerequisites pass:
+```bash
+save_setup_progress 1
+```
+
+## Step 2: Build Release Binaries
+
+Run from the plugin root:
+
+```bash
+cd "$PLUGIN_ROOT"
 cargo build --release -p dynamite-server -p dynamite-memory
 ```
 
-Confirm the binaries exist:
-- `target/release/dynamite-server`
-- `target/release/dynamite-memory`
-- `target/release/dynamite-memory-cli`
+If the build fails, stop and report the error. Do not continue.
 
-## Step 2: Create data directory
+Confirm the binaries exist:
+
+```bash
+ls -l "$PLUGIN_ROOT/target/release/dynamite-server" \
+      "$PLUGIN_ROOT/target/release/dynamite-memory" \
+      "$PLUGIN_ROOT/target/release/dynamite-memory-cli"
+```
+
+All three must be present. Save progress:
+```bash
+save_setup_progress 2
+```
+
+## Step 3: Create Data Directory and Start Server
 
 ```bash
 mkdir -p ~/.local/share/dynamite
 ```
 
-## Step 3: Start the DynaMite server
-
-Check if the server is already running by testing the socket:
+Check if the server is already running:
 
 ```bash
-ls -la ~/.local/share/dynamite/server.sock 2>/dev/null
+if [ -S ~/.local/share/dynamite/server.sock ]; then
+  # Socket exists — test if server is responsive
+  timeout 2 "$PLUGIN_ROOT/target/release/dynamite-memory-cli" discover >/dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "Server already running and responsive."
+  else
+    echo "Stale socket found. Restarting server..."
+    rm -f ~/.local/share/dynamite/server.sock
+  fi
+else
+  echo "No server running. Starting..."
+fi
 ```
 
-If the socket exists, test if the server is responsive by running:
+If the server is not running (socket missing or stale), start it:
 
 ```bash
-target/release/dynamite-memory-cli discover
-```
-
-If the CLI hangs or the socket doesn't exist, start the server:
-
-```bash
-rm -f ~/.local/share/dynamite/server.sock
-nohup target/release/dynamite-server \
+nohup "$PLUGIN_ROOT/target/release/dynamite-server" \
   --db ~/.local/share/dynamite/memory.db \
   --socket ~/.local/share/dynamite/server.sock \
   > /dev/null 2>&1 &
+
+# Wait for socket to appear (up to 3 seconds)
+for i in 1 2 3; do
+  [ -S ~/.local/share/dynamite/server.sock ] && break
+  sleep 1
+done
 ```
 
-Wait 1 second then verify the socket was created.
-
-## Step 4: Verify the CLI
-
-Run:
+Verify the socket was created:
 
 ```bash
-target/release/dynamite-memory-cli discover
+[ -S ~/.local/share/dynamite/server.sock ] && echo "Server started." || echo "ERROR: Server failed to start."
 ```
 
-This should return `[]` (empty array) or a list of categories. If it hangs, the server failed to start — check stderr.
-
-## Step 5: Test round-trip
-
-Store a test memory, recall it, then clean up:
-
+If the server failed to start, stop and report. Save progress:
 ```bash
-target/release/dynamite-memory-cli remember --category _setup-test --key check --content "Setup verification"
-target/release/dynamite-memory-cli recall --category _setup-test
-target/release/dynamite-memory-cli forget --category _setup-test --key check
+save_setup_progress 3
 ```
 
-All three commands should succeed.
+## Step 4: Verify Round-Trip
 
-## Step 6: Activate MCP server
-
-Now that the build is verified, write the `.mcp.json` file at the plugin root so Claude Code discovers the MCP server on next restart:
+Test store, recall, and cleanup:
 
 ```bash
-cat > "${CLAUDE_PLUGIN_ROOT}/.mcp.json" << 'EOF'
+"$PLUGIN_ROOT/target/release/dynamite-memory-cli" remember --category _setup-test --key check --content "Setup verification"
+"$PLUGIN_ROOT/target/release/dynamite-memory-cli" recall --category _setup-test
+"$PLUGIN_ROOT/target/release/dynamite-memory-cli" forget --category _setup-test --key check
+```
+
+All three commands must succeed. If any fails, stop and report. Save progress:
+```bash
+save_setup_progress 4
+```
+
+## Step 5: Activate MCP Server
+
+Write the `.mcp.json` file at the plugin root so Claude Code discovers the MCP server on next restart:
+
+```bash
+cat > "${PLUGIN_ROOT}/.mcp.json" << 'EOF'
 {
   "mcpServers": {
     "dynamite-memory": {
@@ -90,19 +199,76 @@ cat > "${CLAUDE_PLUGIN_ROOT}/.mcp.json" << 'EOF'
   }
 }
 EOF
+echo "Wrote .mcp.json to ${PLUGIN_ROOT}/.mcp.json"
 ```
 
-If `CLAUDE_PLUGIN_ROOT` is not set (e.g. running from the source checkout), write to the repo root instead.
+Save progress:
+```bash
+save_setup_progress 5
+```
 
-## Step 7: Report status
+## Step 6: Clear State and Show Welcome
 
-Tell the user:
+Clear the setup state file:
 
-1. **Server**: running at `~/.local/share/dynamite/server.sock`, database at `~/.local/share/dynamite/memory.db`
-2. **MCP tools**: `remember`, `recall`, `discover`, `forget` — available via the dynamite-memory MCP server (active after restarting Claude Code)
-3. **Hooks**: UserPromptSubmit (auto-retrieval) and PreCompact (auto-save) configured
-4. **CLI**: `target/release/dynamite-memory-cli` for direct access
+```bash
+rm -f "$STATE_FILE"
+```
 
-Tell the user to **restart Claude Code** for the MCP server to be picked up.
+Display the following:
 
-If an `ANTHROPIC_API_KEY` is set, the hooks will use Claude Haiku for intelligent memory selection and extraction. Otherwise they fall back to fetching all memories.
+```
+DynaMite Memory Setup Complete!
+
+SERVER
+  Socket:   ~/.local/share/dynamite/server.sock
+  Database: ~/.local/share/dynamite/memory.db
+
+MCP TOOLS (available after restarting Claude Code)
+  remember  - Store a memory under a category and key
+  recall    - Retrieve memories from a category
+  discover  - List all memory categories
+  forget    - Remove a specific memory
+
+HOOKS
+  UserPromptSubmit - Automatically recalls relevant memories before each prompt
+  PreCompact       - Saves important learnings before conversation compaction
+
+CLI (direct access)
+  $PLUGIN_ROOT/target/release/dynamite-memory-cli
+
+NEXT STEP
+  Restart Claude Code for the MCP server and hooks to take effect.
+```
+
+If `ANTHROPIC_API_KEY` is set in the environment, add:
+
+> **Smart memory selection is enabled.** Hooks will use Claude Haiku to intelligently filter relevant memories. Without the API key, hooks fall back to fetching all memories.
+
+## Help Text
+
+When user runs `/dynamite-memory:setup --help`, display:
+
+```
+DynaMite Memory Setup
+
+USAGE:
+  /dynamite-memory:setup         Run full setup (build, server, MCP activation)
+  /dynamite-memory:setup --help  Show this help
+
+WHAT IT DOES:
+  1. Checks for Rust toolchain (cargo)
+  2. Builds release binaries (dynamite-server, dynamite-memory, dynamite-memory-cli)
+  3. Creates data directory (~/.local/share/dynamite)
+  4. Starts the DynaMite server daemon
+  5. Verifies round-trip memory storage
+  6. Writes .mcp.json to activate MCP tools
+
+PREREQUISITES:
+  - Rust toolchain (https://rustup.rs)
+
+AFTER SETUP:
+  Restart Claude Code for MCP tools and hooks to activate.
+
+For more info: https://github.com/AetherXHub/dynamite
+```
