@@ -16,8 +16,8 @@ name = "dynamite-memory-cli"
 path = "src/cli.rs"
 
 [dependencies]
-dynamite-core = { path = "../dynamite-core" }
-dynamite-server = { path = "../dynamite-server" }
+dynamite-core = { git = "https://github.com/AetherXHub/dynamitedb" }
+dynamite-server = { git = "https://github.com/AetherXHub/dynamitedb" }
 rmcp = { version = "0.14", features = ["server", "transport-io"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

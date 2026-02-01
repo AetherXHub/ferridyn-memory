@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "dynamite",
-  "description": "DynaMite plugins for Claude Code",
+  "name": "dynamite-memory",
+  "description": "Agentic memory plugin for Claude Code backed by DynaMite",
   "owner": {
     "name": "Travis Stanley",
     "email": "travis@foxworks.dev"
@@ -17,7 +17,7 @@
       },
       "source": "./",
       "category": "memory",
-      "homepage": "https://github.com/AetherXHub/dynamite",
+      "homepage": "https://github.com/AetherXHub/dynamite-memory",
       "tags": ["memory", "agentic-memory", "dynamodb", "embedded-database"]
     }
   ]

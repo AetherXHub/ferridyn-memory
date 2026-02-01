@@ -1,0 +1,4 @@
+# Uncomment for local dynamitedb development
+# [patch."https://github.com/AetherXHub/dynamitedb"]
+# dynamite-core = { path = "../dynamitedb/crates/dynamite-core" }
+# dynamite-server = { path = "../dynamitedb/crates/dynamite-server" }

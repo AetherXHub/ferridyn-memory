@@ -117,21 +117,27 @@ save_setup_progress 1
 
 ## Step 2: Build Release Binaries
 
-Run from the plugin root:
+Build the plugin binaries from the plugin root:
 
 ```bash
 cd "$PLUGIN_ROOT"
-cargo build --release -p dynamite-server -p dynamite-memory
+cargo build --release
 ```
 
 If the build fails, stop and report the error. Do not continue.
 
+Install the DynaMite server binary from the database repo:
+
+```bash
+cargo install dynamite-server --git https://github.com/AetherXHub/dynamitedb
+```
+
 Confirm the binaries exist:
 
 ```bash
-ls -l "$PLUGIN_ROOT/target/release/dynamite-server" \
-      "$PLUGIN_ROOT/target/release/dynamite-memory" \
+ls -l "$PLUGIN_ROOT/target/release/dynamite-memory" \
       "$PLUGIN_ROOT/target/release/dynamite-memory-cli"
+command -v dynamite-server >/dev/null 2>&1 && echo "dynamite-server: OK" || echo "dynamite-server: MISSING"
 ```
 
 All three must be present. Save progress:
@@ -165,7 +171,7 @@ fi
 If the server is not running (socket missing or stale), start it:
 
 ```bash
-nohup "$PLUGIN_ROOT/target/release/dynamite-server" \
+nohup dynamite-server \
   --db ~/.local/share/dynamite/memory.db \
   --socket ~/.local/share/dynamite/server.sock \
   > /dev/null 2>&1 &
@@ -287,7 +293,7 @@ USAGE:
 
 WHAT IT DOES:
   1. Checks for Rust toolchain (cargo) and ANTHROPIC_API_KEY
-  2. Builds release binaries (dynamite-server, dynamite-memory, dynamite-memory-cli)
+  2. Builds plugin binaries and installs dynamite-server from dynamitedb repo
   3. Creates data directory (~/.local/share/dynamite)
   4. Starts the DynaMite server daemon
   5. Verifies round-trip memory storage
@@ -300,5 +306,5 @@ PREREQUISITES:
 AFTER SETUP:
   Restart Claude Code for MCP tools and hooks to activate.
 
-For more info: https://github.com/AetherXHub/dynamite
+For more info: https://github.com/AetherXHub/dynamite-memory
 ```

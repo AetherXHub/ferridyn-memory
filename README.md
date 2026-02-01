@@ -1,44 +1,61 @@
-# DynaMite Memory
+# DynaMite Memory Plugin for Claude Code
 
-An agentic memory system for Claude Code, backed by DynaMite.
+Self-contained Claude Code plugin that provides:
 
-## What it provides
+1. **MCP server** — `remember`, `recall`, `discover`, `forget` tools available directly in Claude
+2. **Auto-retrieval hook** (UserPromptSubmit) — automatically injects relevant memories into context before Claude processes each prompt
+3. **Auto-save hook** (PreCompact) — extracts and persists important learnings before conversation compaction
+4. **Setup skill** — `/dynamite-memory:setup` bootstraps the entire system
 
-- **MCP server binary** (`dynamite-memory`) exposing 4 tools: remember, recall, discover, forget
-- **CLI binary** (`dynamite-memory-cli`) with the same 4 subcommands
-- **Shared library** with MemoryBackend abstraction (Direct DB or Server client)
-
-## MCP Tools
-
-- `remember(category, key, content, metadata?)` — store a memory
-- `recall(category, prefix?, limit?)` — retrieve memories by category
-- `discover(category?, limit?)` — browse categories and sort key prefixes
-- `forget(category, key)` — delete a memory
-
-## CLI Usage
+## Install
 
 ```bash
-dynamite-memory-cli discover
-dynamite-memory-cli discover --category rust
-dynamite-memory-cli recall --category rust --prefix ownership --limit 10
-dynamite-memory-cli remember --category rust --key "ownership#borrowing" --content "References allow borrowing"
-dynamite-memory-cli forget --category rust --key "ownership#borrowing"
+# Add the plugin to Claude Code
+/plugin marketplace add AetherXHub/dynamite-memory
 ```
 
-## Backend modes
+After installing, run `/dynamite-memory:setup` to build binaries, start the server, and verify everything works.
 
-- **Server mode**: Connects to `dynamite-server` via Unix socket (preferred — allows concurrent access)
-- **Direct mode**: Opens database file directly with exclusive flock (fallback when server not running)
+## Setup
 
-## Environment variables
+Run `/dynamite-memory:setup` in Claude Code. It will:
 
-- `DYNAMITE_MEMORY_SOCKET` — socket path (default: `~/.local/share/dynamite/server.sock`)
-- `DYNAMITE_MEMORY_DB` — database path for direct mode (default: `~/.local/share/dynamite/memory.db`)
+1. Build the release binaries
+2. Start the DynaMite server
+3. Verify the CLI and MCP tools work
+4. Test a round-trip memory store/recall/forget
 
-## Data model
+## Architecture
 
-Memories stored in a `memories` table with:
+```
+dynamite-server (background, owns DB file)
+    ^ Unix socket (~/.local/share/dynamite/server.sock)
+    |
+    +-- dynamite-memory (MCP server, provides tools to Claude)
+    +-- dynamite-memory-cli (used by hooks for read/write)
+```
 
-- **Partition key**: `category` (String) — semantic category like "rust-patterns", "project-context"
-- **Sort key**: `key` (String) — hierarchical identifier using `#` separator like "ownership#borrowing"
-- **Attributes**: `content` (the memory text), optional `metadata`
+## Hooks
+
+- **memory-retrieval.mjs** (UserPromptSubmit): Discovers stored memories, selects relevant ones (using Claude Haiku if ANTHROPIC_API_KEY is set, or fetches all as fallback), injects as `additionalContext`
+- **memory-commit.mjs** (PreCompact): Reads recent transcript, uses Claude Haiku to extract key learnings, stores them as memories
+
+## Configuration
+
+- `DYNAMITE_MEMORY_CLI` — override CLI binary path
+- `DYNAMITE_MEMORY_SOCKET` — override server socket path
+- `ANTHROPIC_API_KEY` — enables intelligent memory selection/extraction via Claude Haiku
+
+## Plugin Structure
+
+```
+(repo root)
+  .claude-plugin/plugin.json   — plugin metadata
+  .mcp.json                    — MCP server declaration
+  hooks/hooks.json             — hook configuration
+  scripts/
+    config.mjs                 — shared utilities
+    memory-retrieval.mjs       — auto-retrieval hook
+    memory-commit.mjs          — auto-save hook
+  skills/setup/SKILL.md        — /dynamite-memory:setup
+```
