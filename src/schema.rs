@@ -291,7 +291,8 @@ pub async fn resolve_query(
 
     let completion = llm.complete(RESOLVE_SYSTEM_PROMPT, &user_msg).await?;
 
-    let parsed: serde_json::Value = serde_json::from_str(completion.text.trim()).map_err(|e| {
+    let cleaned = strip_markdown_fences(completion.text.trim());
+    let parsed: serde_json::Value = serde_json::from_str(&cleaned).map_err(|e| {
         LlmError::Parse(format!(
             "Failed to parse resolve response: {e}\nResponse: {}",
             completion.text
@@ -764,5 +765,31 @@ mod tests {
             .unwrap();
         assert_eq!(category, "project");
         assert!(prefix.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_query_with_markdown_fences() {
+        let mock = MockLlmClient::new(vec![
+            "```json\n{\"category\":\"people\",\"prefix\":\"toby\"}\n```".into(),
+        ]);
+
+        let schemas = vec![(
+            "people".to_string(),
+            CategorySchema {
+                description: "Contacts".into(),
+                sort_key_format: "{name}#{attribute}".into(),
+                segments: IndexMap::from([
+                    ("name".into(), "person name".into()),
+                    ("attribute".into(), "detail".into()),
+                ]),
+                examples: vec!["toby#email".into()],
+            },
+        )];
+
+        let (category, prefix) = resolve_query(&mock, &schemas, "Toby's email")
+            .await
+            .unwrap();
+        assert_eq!(category, "people");
+        assert_eq!(prefix.unwrap(), "toby");
     }
 }

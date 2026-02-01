@@ -116,7 +116,7 @@ impl AnthropicClient {
     /// Create a new client by reading the API key from the environment.
     ///
     /// Reads the `ANTHROPIC_API_KEY` environment variable. Uses default
-    /// model `claude-haiku-4-20250414` and max tokens `2048`.
+    /// model `claude-haiku-4-5` and max tokens `2048`.
     ///
     /// # Errors
     ///
@@ -128,11 +128,11 @@ impl AnthropicClient {
 
     /// Create a new client with an explicit API key.
     ///
-    /// Uses default model `claude-haiku-4-20250414` and max tokens `2048`.
+    /// Uses default model `claude-haiku-4-5` and max tokens `2048`.
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
-            model: "claude-haiku-4-20250414".to_string(),
+            model: "claude-haiku-4-5".to_string(),
             max_tokens: 2048,
             client: reqwest::Client::new(),
         }
