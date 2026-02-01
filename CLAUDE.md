@@ -2,7 +2,7 @@
 
 ## Project
 
-DynaMite Memory is a Claude Code plugin providing agentic memory backed by the DynaMite embedded database. It stores and retrieves memories via an MCP server, with automatic context retrieval and learning hooks.
+DynamiteDB Memory is a Claude Code plugin providing agentic memory backed by the DynamiteDB embedded database. It stores and retrieves memories via an MCP server, with automatic context retrieval and learning hooks.
 
 ## Build Commands
 

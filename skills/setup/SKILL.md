@@ -1,11 +1,11 @@
 ---
 name: setup
-description: Build and configure the DynaMite memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
+description: Build and configure the DynamiteDB memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
 ---
 
-# DynaMite Memory Setup
+# DynamiteDB Memory Setup
 
-This is the setup command for the DynaMite memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
+This is the setup command for the DynamiteDB memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
 
 ## Graceful Interrupt Handling
 
@@ -87,7 +87,7 @@ command -v jq >/dev/null 2>&1 && echo "jq: OK" || echo "jq: MISSING (optional, u
 
 If `cargo` is missing, stop and tell the user:
 
-> **DynaMite is written in Rust.** Install the Rust toolchain first:
+> **DynamiteDB is written in Rust.** Install the Rust toolchain first:
 > ```
 > curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 > ```
@@ -126,7 +126,7 @@ cargo build --release
 
 If the build fails, stop and report the error. Do not continue.
 
-Install the DynaMite server binary from the database repo:
+Install the DynamiteDB server binary from the database repo:
 
 ```bash
 cargo install dynamite-server --git https://github.com/AetherXHub/dynamitedb
@@ -245,7 +245,7 @@ rm -f "$STATE_FILE"
 Display the following:
 
 ```
-DynaMite Memory Setup Complete!
+DynamiteDB Memory Setup Complete!
 
 SERVER
   Socket:   ~/.local/share/dynamite/server.sock
@@ -285,7 +285,7 @@ If `ANTHROPIC_API_KEY` is set in the environment, add:
 When user runs `/dynamite-memory:setup --help`, display:
 
 ```
-DynaMite Memory Setup
+DynamiteDB Memory Setup
 
 USAGE:
   /dynamite-memory:setup         Run full setup (build, server, MCP activation)
@@ -295,7 +295,7 @@ WHAT IT DOES:
   1. Checks for Rust toolchain (cargo) and ANTHROPIC_API_KEY
   2. Builds plugin binaries and installs dynamite-server from dynamitedb repo
   3. Creates data directory (~/.local/share/dynamite)
-  4. Starts the DynaMite server daemon
+  4. Starts the DynamiteDB server daemon
   5. Verifies round-trip memory storage
   6. Writes .mcp.json to activate MCP tools (with API key passthrough)
 

@@ -42,7 +42,7 @@ async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> 
 
     // Try server connection first.
     if socket_path.exists() {
-        match dynamite_server::DynaMiteClient::connect(&socket_path).await {
+        match dynamite_server::DynamiteClient::connect(&socket_path).await {
             Ok(mut client) => {
                 // Ensure the memories table exists on the server.
                 ensure_memories_table_via_server(&mut client).await?;

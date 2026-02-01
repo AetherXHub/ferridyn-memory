@@ -1,4 +1,4 @@
-// Shared utilities for DynaMite memory hooks.
+// Shared utilities for DynamiteDB memory hooks.
 // Zero npm dependencies — Node.js built-ins only.
 
 import { execFile } from "node:child_process";

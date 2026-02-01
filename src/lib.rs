@@ -1,4 +1,4 @@
-//! DynaMite Memory — shared library for MCP server and CLI.
+//! DynamiteDB Memory — shared library for MCP server and CLI.
 
 pub mod backend;
 pub mod error;
@@ -34,15 +34,15 @@ pub fn resolve_db_path() -> PathBuf {
 /// Open or create the database directly and ensure the memories table exists.
 pub fn init_db_direct(
     path: &std::path::Path,
-) -> Result<dynamite_core::api::DynaMite, Box<dyn std::error::Error>> {
+) -> Result<dynamite_core::api::DynamiteDB, Box<dyn std::error::Error>> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
     let db = if path.exists() {
-        dynamite_core::api::DynaMite::open(path)?
+        dynamite_core::api::DynamiteDB::open(path)?
     } else {
-        dynamite_core::api::DynaMite::create(path)?
+        dynamite_core::api::DynamiteDB::create(path)?
     };
 
     ensure_memories_table_direct(&db)?;
@@ -51,7 +51,7 @@ pub fn init_db_direct(
 
 /// Create the memories table if it doesn't already exist (direct DB access).
 fn ensure_memories_table_direct(
-    db: &dynamite_core::api::DynaMite,
+    db: &dynamite_core::api::DynamiteDB,
 ) -> Result<(), dynamite_core::error::Error> {
     use dynamite_core::types::KeyType;
 
@@ -71,7 +71,7 @@ fn ensure_memories_table_direct(
 
 /// Ensure the memories table exists via a server client.
 pub async fn ensure_memories_table_via_server(
-    client: &mut dynamite_server::DynaMiteClient,
+    client: &mut dynamite_server::DynamiteClient,
 ) -> Result<(), dynamite_server::error::ClientError> {
     use dynamite_server::protocol::KeyDef;
 

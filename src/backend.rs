@@ -1,4 +1,4 @@
-//! Backend abstraction: direct DynaMite handle or server client.
+//! Backend abstraction: direct DynamiteDB handle or server client.
 
 use std::sync::Arc;
 
@@ -6,19 +6,19 @@ use rmcp::ErrorData;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use dynamite_core::api::DynaMite;
-use dynamite_server::DynaMiteClient;
+use dynamite_core::api::DynamiteDB;
+use dynamite_server::DynamiteClient;
 
 use crate::TABLE_NAME;
 
 /// Unified backend for memory operations.
 ///
-/// `Direct` uses an in-process DynaMite handle (exclusive file lock).
-/// `Server` uses a DynaMiteClient connected to a running `dynamite-server`.
+/// `Direct` uses an in-process DynamiteDB handle (exclusive file lock).
+/// `Server` uses a DynamiteClient connected to a running `dynamite-server`.
 #[derive(Clone)]
 pub enum MemoryBackend {
-    Direct(DynaMite),
-    Server(Arc<Mutex<DynaMiteClient>>),
+    Direct(DynamiteDB),
+    Server(Arc<Mutex<DynamiteClient>>),
 }
 
 impl MemoryBackend {

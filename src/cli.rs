@@ -13,7 +13,7 @@ use dynamite_memory::{
 #[derive(Parser)]
 #[command(
     name = "dynamite-memory-cli",
-    about = "CLI for DynaMite memory operations"
+    about = "CLI for DynamiteDB memory operations"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -230,7 +230,7 @@ async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> 
     let socket_path = resolve_socket_path();
 
     if socket_path.exists() {
-        match dynamite_server::DynaMiteClient::connect(&socket_path).await {
+        match dynamite_server::DynamiteClient::connect(&socket_path).await {
             Ok(mut client) => {
                 ensure_memories_table_via_server(&mut client).await?;
                 return Ok(MemoryBackend::Server(Arc::new(Mutex::new(client))));

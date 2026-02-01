@@ -1,4 +1,4 @@
-# DynaMite Memory Plugin for Claude Code
+# DynamiteDB Memory Plugin for Claude Code
 
 Self-contained Claude Code plugin that provides:
 
@@ -21,7 +21,7 @@ After installing, run `/dynamite-memory:setup` to build binaries, start the serv
 Run `/dynamite-memory:setup` in Claude Code. It will:
 
 1. Build the release binaries
-2. Start the DynaMite server
+2. Start the DynamiteDB server
 3. Verify the CLI and MCP tools work
 4. Test a round-trip memory store/recall/forget
 

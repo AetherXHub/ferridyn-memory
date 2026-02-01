@@ -280,7 +280,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 [[package]]
 name = "dynamite-core"
 version = "0.1.0"
-source = "git+https://github.com/AetherXHub/dynamitedb#5ac42e093d50cdb527d1b02c77043a2c441f3b71"
+source = "git+https://github.com/AetherXHub/dynamitedb#e26e86aba70ec7d3b02274c508dc64977be77302"
 dependencies = [
  "bytes",
  "fs2",
@@ -318,7 +318,7 @@ dependencies = [
 [[package]]
 name = "dynamite-server"
 version = "0.1.0"
-source = "git+https://github.com/AetherXHub/dynamitedb#5ac42e093d50cdb527d1b02c77043a2c441f3b71"
+source = "git+https://github.com/AetherXHub/dynamitedb#e26e86aba70ec7d3b02274c508dc64977be77302"
 dependencies = [
  "dirs",
  "dynamite-core",
