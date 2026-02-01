@@ -64,7 +64,7 @@ export async function callHaiku(systemPrompt, userMessage) {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-20250414",
+          model: "claude-haiku-4-5",
           max_tokens: 2048,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
