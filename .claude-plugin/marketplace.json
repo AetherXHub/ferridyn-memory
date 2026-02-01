@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dynamite",
+  "version": "1.0.0",
+  "description": "DynaMite plugins for Claude Code",
+  "owner": {
+    "name": "Travis Stanley",
+    "email": "travis@foxworks.dev"
+  },
+  "plugins": [
+    {
+      "name": "dynamite-memory",
+      "description": "Agentic memory system backed by DynaMite. Automatically recalls relevant context and persists learnings across sessions.",
+      "source": ".",
+      "category": "memory"
+    }
+  ]
+}
