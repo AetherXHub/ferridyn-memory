@@ -115,12 +115,24 @@ Save progress after prerequisites pass:
 save_setup_progress 1
 ```
 
-## Step 2: Build Release Binaries
+## Step 2: Build Hook Scripts and Release Binaries
 
-Build the plugin binaries from the plugin root:
+Install Node.js dependencies and build the TypeScript hook scripts:
 
 ```bash
 cd "$PLUGIN_ROOT"
+npm install
+npm run build:scripts
+```
+
+If `npm` is missing, warn the user:
+
+> **Node.js is required for hook scripts.** Install Node.js 20+ first.
+> The MCP server (Rust) will work without it, but hooks (auto-retrieval, auto-save, session reflection) will not.
+
+Build the plugin binaries:
+
+```bash
 cargo build --release
 ```
 
@@ -264,10 +276,18 @@ SKILLS (slash commands)
   /ferridyn-memory:forget    - Safe memory removal workflow
   /ferridyn-memory:browse    - Interactive memory exploration
   /ferridyn-memory:learn     - Deep codebase exploration → persistent memory
+  /ferridyn-memory:teach     - Conversational memory capture ("remember that...")
+  /ferridyn-memory:reflect   - Post-task learning extraction
+  /ferridyn-memory:context   - Pre-task memory retrieval
+  /ferridyn-memory:update    - Correct stale memories
+  /ferridyn-memory:decide    - Log decisions with rationale
+  /ferridyn-memory:status    - Quick memory overview
+  /ferridyn-memory:health    - Memory diagnostics
 
 HOOKS
-  UserPromptSubmit - Automatically recalls relevant memories before each prompt
+  UserPromptSubmit - Recalls memories + injects proactive memory protocol
   PreCompact       - Saves important learnings before conversation compaction
+  Stop             - Reflects on session and persists high-level learnings
 
 CLI (direct access)
   $PLUGIN_ROOT/target/release/ferridyn-memory-cli
@@ -292,12 +312,13 @@ USAGE:
   /ferridyn-memory:setup --help  Show this help
 
 WHAT IT DOES:
-  1. Checks for Rust toolchain (cargo) and ANTHROPIC_API_KEY
-  2. Builds plugin binaries and installs ferridyn-server from ferridyndb repo
-  3. Creates data directory (~/.local/share/ferridyn)
-  4. Starts the FerridynDB server daemon
-  5. Verifies round-trip memory storage
-  6. Writes .mcp.json to activate MCP tools (with API key passthrough)
+  1. Checks for Rust toolchain (cargo), Node.js (npm), and ANTHROPIC_API_KEY
+  2. Installs npm deps and builds TypeScript hook scripts (tsup)
+  3. Builds plugin binaries and installs ferridyn-server from ferridyndb repo
+  4. Creates data directory (~/.local/share/ferridyn)
+  5. Starts the FerridynDB server daemon
+  6. Verifies round-trip memory storage
+  7. Writes .mcp.json to activate MCP tools (with API key passthrough)
 
 PREREQUISITES:
   - Rust toolchain (https://rustup.rs)

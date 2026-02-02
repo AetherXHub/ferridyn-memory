@@ -12,6 +12,9 @@ Claude Code sessions are ephemeral — knowledge is lost when conversations end 
 
 ## Build Commands
 
+- `npm install` — install Node.js dev dependencies (tsup, typescript)
+- `npm run build:scripts` — compile TypeScript hook scripts to `scripts/dist/`
+- `npm run build:all` — build scripts + Rust binaries (full build)
 - `cargo build` — compile the plugin (ferridyn-memory MCP server + ferridyn-memory-cli)
 - `cargo build --release` — release build (required for plugin deployment)
 - `cargo test` — run all tests (52 tests)
@@ -51,21 +54,36 @@ Schemas are stored in a `_schema` meta-category within the same database.
 | `forget` | Remove a specific memory by category and key |
 | `define` | Explicitly define or update a category's key schema |
 
-### Hooks (2)
+### Hooks (3)
 
-- **UserPromptSubmit** (`memory-retrieval.mjs`) — Before each prompt, discovers stored memories, selects relevant ones via Haiku, injects as context
-- **PreCompact** (`memory-commit.mjs`) — Before conversation compaction, extracts key learnings from the transcript via Haiku and persists them
+- **UserPromptSubmit** (`memory-retrieval.ts`) — Before each prompt, discovers stored memories, selects relevant ones via Haiku, injects as context. Also injects the **Memory Protocol** — behavioral guidance that tells the agent when to proactively commit, retrieve, and correct memories mid-conversation.
+- **PreCompact** (`memory-commit.ts`) — Before conversation compaction, extracts key learnings from the transcript via Haiku and persists them
+- **Stop** (`memory-reflect.ts`) — When a session ends, reflects on the conversation and persists high-level learnings (decisions, patterns, preferences). Complementary to PreCompact — focuses on big-picture takeaways rather than granular facts.
 
-### Skills (6)
+### Skills (13)
+
+#### Core Skills (user-invoked)
 
 | Skill | Purpose |
 |-------|---------|
-| `setup` | Build binaries, start server, activate MCP tools and hooks |
+| `setup` | Build binaries and scripts, start server, activate MCP tools and hooks |
 | `remember` | Guidance on what/how to store memories |
 | `recall` | Precise and natural language retrieval patterns |
 | `forget` | Safe memory removal workflow |
 | `browse` | Interactive memory exploration |
 | `learn` | Deep codebase exploration that builds persistent project memory |
+| `health` | Memory integrity diagnostics — schema coverage, empty categories, issues |
+
+#### Proactive Skills (agent auto-triggered + user-invokable)
+
+| Skill | Auto-Trigger | Purpose |
+|-------|-------------|---------|
+| `teach` | "remember that...", "note that...", "from now on..." | Parse natural language into structured memory — user doesn't need to know categories or keys |
+| `reflect` | After completing significant work | Extract and persist learnings — decisions, patterns, gotchas, preferences |
+| `context` | Before starting complex work | Pull relevant memories; ask and store if expected knowledge is missing |
+| `update` | When information changes or contradicts stored data | Find stale memories and replace them |
+| `decide` | When a significant decision is made | Log decisions with rationale, alternatives, and constraints |
+| `status` | Session start, "what do you know about..." | Quick overview of memory contents by category |
 
 ## Architecture
 
@@ -82,14 +100,21 @@ src/
 ```
 
 ```
-skills/       — 6 SKILL.md files (setup, remember, recall, forget, browse, learn)
-commands/     — 6 command .md files
-hooks/        — hooks.json (UserPromptSubmit, PreCompact)
-scripts/      — Hook implementations (Node.js, zero npm deps)
-  config.mjs            — Shared utilities: CLI runner, Haiku caller, JSON extraction
-  memory-retrieval.mjs  — Auto-retrieval hook
-  memory-commit.mjs     — Auto-save hook
-.claude-plugin/         — Plugin metadata (plugin.json, marketplace.json)
+skills/       — 13 SKILL.md files (setup, remember, recall, forget, browse, learn, health,
+                teach, reflect, context, update, decide, status)
+commands/     — 13 command .md files
+hooks/        — hooks.json (UserPromptSubmit, PreCompact, Stop)
+scripts/
+  src/                    — TypeScript source (compiled by tsup)
+    types.ts              — Shared type definitions
+    config.ts             — Shared utilities: CLI runner, Haiku caller, JSON extraction
+    memory-retrieval.ts   — UserPromptSubmit hook + memory protocol injection
+    memory-commit.ts      — PreCompact hook (auto-save)
+    memory-reflect.ts     — Stop hook (session reflection)
+    memory-health.ts      — Diagnostics utility (standalone)
+    memory-stats.ts       — Stats utility (standalone)
+  dist/                   — Built output (.mjs files, produced by `npm run build:scripts`)
+.claude-plugin/           — Plugin metadata (plugin.json, marketplace.json)
 ```
 
 ## Dependencies
@@ -117,7 +142,8 @@ This crate depends on `ferridyn-core` and `ferridyn-server` from the [ferridyndb
 
 ## Development Process
 
-1. **Build** — `cargo build` must pass
-2. **Test** — `cargo test` must pass (52 tests covering schema validation, LLM mocking, MCP tool handlers, backend operations)
-3. **Lint** — `cargo clippy -- -D warnings` must pass
-4. **Format** — `cargo fmt --check` must pass
+1. **Build scripts** — `npm run build:scripts` must produce 5 `.mjs` files in `scripts/dist/`
+2. **Build Rust** — `cargo build` must pass
+3. **Test** — `cargo test` must pass (52 tests covering schema validation, LLM mocking, MCP tool handlers, backend operations)
+4. **Lint** — `cargo clippy -- -D warnings` must pass
+5. **Format** — `cargo fmt --check` must pass

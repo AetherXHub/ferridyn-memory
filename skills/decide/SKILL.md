@@ -1,0 +1,115 @@
+---
+name: decide
+description: Log significant decisions with rationale, alternatives considered, and constraints. Decisions are the highest-value memories — they prevent re-debating in future sessions.
+---
+
+# Decide — Decision Logging
+
+When a significant decision is made, log it with full context. Decisions are the highest-value memories — they answer "why did we do it this way?" without forcing future sessions to re-debate.
+
+## Auto-Trigger Patterns
+
+Invoke this behavior **proactively** when:
+
+- An architectural decision is made (system design, data flow, component boundaries)
+- A technology choice is resolved (library A vs B, framework selection)
+- A design pattern is chosen (error handling strategy, state management approach)
+- A trade-off is resolved (performance vs simplicity, consistency vs flexibility)
+- User says "let's go with X" after discussing alternatives
+- A convention is established ("from now on, we'll do X")
+
+You do NOT need to wait for `/ferridyn-memory:decide` — log decisions as they happen.
+
+## What Makes a Decision Worth Logging
+
+**Log it if:**
+- It was debated or had alternatives
+- It affects future work in the same area
+- Someone might ask "why" later
+- Reversing it would be non-trivial
+
+**Skip it if:**
+- It's trivial (variable naming, minor formatting)
+- It's forced (only one option exists)
+- It's temporary ("let's try X for now")
+
+## Workflow
+
+### Step 1: Check for Prior Decisions
+
+Before logging, check if there's an existing decision in the same area:
+
+```
+MCP tool: recall
+  category: "decisions"
+  prefix: "{area}"
+```
+
+If a prior decision exists in the same area, note whether the new decision supersedes, refines, or conflicts with it.
+
+### Step 2: Structure the Decision
+
+A well-structured decision memory includes:
+
+- **Decision**: What was decided
+- **Rationale**: Why this option was chosen
+- **Alternatives**: What else was considered and why it was rejected
+- **Constraints**: What factors shaped the decision
+- **Scope**: What this affects
+
+### Step 3: Store
+
+```
+MCP tool: remember
+  category: "decisions"
+  key: "{area}#{decision-name}"
+  content: |
+    Decision: {what was decided}
+    Rationale: {why}
+    Alternatives considered: {what else, why rejected}
+    Constraints: {what shaped this}
+  metadata: "source: conversation, {date}"
+```
+
+### Step 4: Confirm
+
+> Logged decision: **decisions** `auth#jwt-refresh-strategy`
+> Chose 15-minute access tokens with 7-day refresh tokens. Alternatives: session cookies (rejected — serverless), long-lived tokens (rejected — security).
+
+## Key Format Convention
+
+The `decisions` category uses `{area}#{decision-name}`:
+
+| Area | Example Keys |
+|------|-------------|
+| `auth` | `auth#token-strategy`, `auth#provider-selection` |
+| `database` | `database#engine-choice`, `database#schema-migration-tool` |
+| `api` | `api#versioning-strategy`, `api#error-format` |
+| `frontend` | `frontend#state-management`, `frontend#css-approach` |
+| `infra` | `infra#hosting-provider`, `infra#ci-cd-pipeline` |
+| `testing` | `testing#framework-choice`, `testing#coverage-strategy` |
+| `architecture` | `architecture#monolith-vs-micro`, `architecture#event-driven` |
+
+## Decision Content Template
+
+For consistency, structure decision content as:
+
+```
+Decision: Use Postgres with Diesel ORM
+Rationale: Need ACID transactions for payment processing; Diesel provides compile-time query validation
+Alternatives: SQLite (insufficient concurrency), MongoDB (no ACID), raw SQL (maintenance burden)
+Constraints: Must support concurrent writes from 3 services; team familiar with SQL
+```
+
+## Superseding Decisions
+
+When a new decision replaces an old one:
+
+1. Recall the old decision
+2. Store the new decision with the same key (overwrites)
+3. Include "Supersedes: {old decision summary}" in the content
+4. Mention why the original decision was revisited
+
+## Integration with Reflect
+
+The `/ferridyn-memory:reflect` skill may surface decisions made during a task. If reflect identifies a decision, it may delegate to this skill's workflow for richer logging.
