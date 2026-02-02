@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use rmcp::ErrorData;
+use crate::error::MemoryError;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
@@ -22,7 +22,7 @@ pub enum MemoryBackend {
 }
 
 impl MemoryBackend {
-    pub async fn put_item(&self, doc: Value) -> Result<(), ErrorData> {
+    pub async fn put_item(&self, doc: Value) -> Result<(), MemoryError> {
         match self {
             Self::Direct(db) => db.put_item(TABLE_NAME, doc).map_err(mcp_core_err),
             Self::Server(client) => client
@@ -34,7 +34,7 @@ impl MemoryBackend {
         }
     }
 
-    pub async fn get_item(&self, category: &str, key: &str) -> Result<Option<Value>, ErrorData> {
+    pub async fn get_item(&self, category: &str, key: &str) -> Result<Option<Value>, MemoryError> {
         match self {
             Self::Direct(db) => db
                 .get_item(TABLE_NAME)
@@ -60,7 +60,7 @@ impl MemoryBackend {
         partition_key: &str,
         prefix: Option<&str>,
         limit: usize,
-    ) -> Result<Vec<Value>, ErrorData> {
+    ) -> Result<Vec<Value>, MemoryError> {
         match self {
             Self::Direct(db) => {
                 let mut builder = db.query(TABLE_NAME).partition_key(partition_key);
@@ -93,7 +93,7 @@ impl MemoryBackend {
         }
     }
 
-    pub async fn delete_item(&self, category: &str, key: &str) -> Result<(), ErrorData> {
+    pub async fn delete_item(&self, category: &str, key: &str) -> Result<(), MemoryError> {
         match self {
             Self::Direct(db) => db
                 .delete_item(TABLE_NAME)
@@ -114,7 +114,7 @@ impl MemoryBackend {
         }
     }
 
-    pub async fn list_partition_keys(&self, limit: usize) -> Result<Vec<Value>, ErrorData> {
+    pub async fn list_partition_keys(&self, limit: usize) -> Result<Vec<Value>, MemoryError> {
         match self {
             Self::Direct(db) => db
                 .list_partition_keys(TABLE_NAME)
@@ -134,7 +134,7 @@ impl MemoryBackend {
         &self,
         category: &str,
         limit: usize,
-    ) -> Result<Vec<Value>, ErrorData> {
+    ) -> Result<Vec<Value>, MemoryError> {
         match self {
             Self::Direct(db) => db
                 .list_sort_key_prefixes(TABLE_NAME)
@@ -156,10 +156,217 @@ impl MemoryBackend {
     }
 }
 
-fn mcp_core_err(err: ferridyn_core::error::Error) -> ErrorData {
-    ErrorData::internal_error(format!("Database error: {err}"), None)
+fn mcp_core_err(err: ferridyn_core::error::Error) -> MemoryError {
+    MemoryError::Database(format!("{err}"))
 }
 
-fn mcp_client_err(err: ferridyn_server::error::ClientError) -> ErrorData {
-    ErrorData::internal_error(format!("Server error: {err}"), None)
+fn mcp_client_err(err: ferridyn_server::error::ClientError) -> MemoryError {
+    MemoryError::Server(format!("{err}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use ferridyn_core::api::FerridynDB;
+    use ferridyn_core::types::KeyType;
+    use serde_json::json;
+
+    fn setup_test_db() -> (FerridynDB, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = FerridynDB::create(dir.path().join("test.db")).unwrap();
+        db.create_table("memories")
+            .partition_key("category", KeyType::String)
+            .sort_key("key", KeyType::String)
+            .execute()
+            .unwrap();
+        (db, dir)
+    }
+
+    #[test]
+    fn test_remember_and_recall() {
+        let (db, _dir) = setup_test_db();
+        db.put_item("memories", json!({"category": "rust", "key": "ownership#borrowing", "content": "References allow borrowing without taking ownership"})).unwrap();
+        let result = db
+            .query("memories")
+            .partition_key("rust")
+            .execute()
+            .unwrap();
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(
+            result.items[0]["content"],
+            "References allow borrowing without taking ownership"
+        );
+    }
+
+    #[test]
+    fn test_recall_with_prefix() {
+        let (db, _dir) = setup_test_db();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "ownership#borrowing", "content": "a"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "ownership#moves", "content": "b"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "lifetimes#basics", "content": "c"}),
+        )
+        .unwrap();
+        let result = db
+            .query("memories")
+            .partition_key("rust")
+            .sort_key_begins_with("ownership")
+            .execute()
+            .unwrap();
+        assert_eq!(result.items.len(), 2);
+    }
+
+    #[test]
+    fn test_recall_with_limit() {
+        let (db, _dir) = setup_test_db();
+        for i in 0..10 {
+            db.put_item("memories", json!({"category": "bulk", "key": format!("item{i:02}"), "content": format!("c{i}")})).unwrap();
+        }
+        let result = db
+            .query("memories")
+            .partition_key("bulk")
+            .limit(3)
+            .execute()
+            .unwrap();
+        assert_eq!(result.items.len(), 3);
+    }
+
+    #[test]
+    fn test_forget() {
+        let (db, _dir) = setup_test_db();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "temp", "content": "temporary"}),
+        )
+        .unwrap();
+        db.delete_item("memories")
+            .partition_key("rust")
+            .sort_key("temp")
+            .execute()
+            .unwrap();
+        let item = db
+            .get_item("memories")
+            .partition_key("rust")
+            .sort_key("temp")
+            .execute()
+            .unwrap();
+        assert!(item.is_none());
+    }
+
+    #[test]
+    fn test_forget_nonexistent_no_error() {
+        let (db, _dir) = setup_test_db();
+        db.delete_item("memories")
+            .partition_key("nonexistent")
+            .sort_key("nothing")
+            .execute()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_discover_categories() {
+        let (db, _dir) = setup_test_db();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "a", "content": "x"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "python", "key": "b", "content": "y"}),
+        )
+        .unwrap();
+        let keys = db.list_partition_keys("memories").execute().unwrap();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn test_discover_prefixes() {
+        let (db, _dir) = setup_test_db();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "ownership#borrowing", "content": "a"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "ownership#moves", "content": "b"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "rust", "key": "lifetimes#basics", "content": "c"}),
+        )
+        .unwrap();
+        let prefixes = db
+            .list_sort_key_prefixes("memories")
+            .partition_key("rust")
+            .execute()
+            .unwrap();
+        assert_eq!(prefixes.len(), 2);
+        assert!(prefixes.contains(&json!("lifetimes")));
+        assert!(prefixes.contains(&json!("ownership")));
+    }
+
+    #[test]
+    fn test_remember_overwrites() {
+        let (db, _dir) = setup_test_db();
+        db.put_item(
+            "memories",
+            json!({"category": "test", "key": "item", "content": "old"}),
+        )
+        .unwrap();
+        db.put_item(
+            "memories",
+            json!({"category": "test", "key": "item", "content": "new"}),
+        )
+        .unwrap();
+        let item = db
+            .get_item("memories")
+            .partition_key("test")
+            .sort_key("item")
+            .execute()
+            .unwrap()
+            .unwrap();
+        assert_eq!(item["content"], "new");
+    }
+
+    #[test]
+    fn test_remember_with_metadata() {
+        let (db, _dir) = setup_test_db();
+        db.put_item("memories", json!({"category": "test", "key": "with-meta", "content": "some content", "metadata": "tag:important"})).unwrap();
+        let item = db
+            .get_item("memories")
+            .partition_key("test")
+            .sort_key("with-meta")
+            .execute()
+            .unwrap()
+            .unwrap();
+        assert_eq!(item["metadata"], "tag:important");
+    }
+
+    #[test]
+    fn test_backend_put_and_query() {
+        use super::MemoryBackend;
+        let (db, _dir) = setup_test_db();
+        let backend = MemoryBackend::Direct(db);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            backend
+                .put_item(json!({"category": "test", "key": "a", "content": "hello"}))
+                .await
+                .unwrap();
+            let items = backend.query("test", None, 10).await.unwrap();
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0]["content"], "hello");
+        });
+    }
 }

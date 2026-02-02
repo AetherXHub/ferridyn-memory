@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-FerridynDB Memory is a Claude Code plugin that gives Claude persistent, schema-aware memory backed by the FerridynDB embedded database. It stores and retrieves memories via an MCP server, with automatic context retrieval before each prompt and learning extraction before conversation compaction.
+FerridynDB Memory is a Claude Code plugin that gives Claude persistent, schema-aware memory backed by the FerridynDB embedded database. It stores and retrieves memories via a CLI (`fmemory`), with automatic context retrieval before each prompt and learning extraction before conversation compaction.
 
 ## Why
 
@@ -15,9 +15,9 @@ Claude Code sessions are ephemeral — knowledge is lost when conversations end 
 - `npm install` — install Node.js dev dependencies (tsup, typescript)
 - `npm run build:scripts` — compile TypeScript hook scripts to `scripts/dist/`
 - `npm run build:all` — build scripts + Rust binaries (full build)
-- `cargo build` — compile the plugin (ferridyn-memory MCP server + ferridyn-memory-cli)
+- `cargo build` — compile the plugin (fmemory CLI)
 - `cargo build --release` — release build (required for plugin deployment)
-- `cargo test` — run all tests (52 tests)
+- `cargo test` — run all tests (41 tests)
 - `cargo clippy -- -D warnings` — lint
 - `cargo fmt --check` — check formatting
 
@@ -25,14 +25,13 @@ Claude Code sessions are ephemeral — knowledge is lost when conversations end 
 
 ### Two Operational Modes
 
-The MCP server and CLI both try to connect to a running `ferridyn-server` via Unix socket first. If no server is available, they fall back to opening the database file directly (exclusive file lock).
+The CLI tries to connect to a running `ferridyn-server` via Unix socket first. If no server is available, it falls back to opening the database file directly (exclusive file lock).
 
 ```
 ferridyn-server (background daemon, owns DB file)
     ^ Unix socket (~/.local/share/ferridyn/server.sock)
     |
-    +-- ferridyn-memory     (MCP server, provides tools to Claude)
-    +-- ferridyn-memory-cli (used by hook scripts for read/write)
+    +-- fmemory          (CLI: human use, hooks, Claude via Bash)
 ```
 
 ### Schema-Aware Memory
@@ -44,15 +43,19 @@ Each memory category can have a schema defining its sort key format:
 
 Schemas are stored in a `_schema` meta-category within the same database.
 
-### MCP Tools (5)
+### CLI Commands
 
-| Tool | Purpose |
-|------|---------|
+The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
+
+| Command | Purpose |
+|---------|---------|
 | `remember` | Store a memory (auto-infers schema on first write to a category) |
 | `recall` | Retrieve memories by category+prefix or natural language query |
 | `discover` | Browse categories with schema descriptions, drill into key prefixes |
 | `forget` | Remove a specific memory by category and key |
 | `define` | Explicitly define or update a category's key schema |
+| `schema` | View schema for a category |
+| NL-first mode | `fmemory "natural language query"` — resolves to recall or other command |
 
 ### Hooks (3)
 
@@ -66,7 +69,7 @@ Schemas are stored in a `_schema` meta-category within the same database.
 
 | Skill | Purpose |
 |-------|---------|
-| `setup` | Build binaries and scripts, start server, activate MCP tools and hooks |
+| `setup` | Build binaries and scripts, start server, activate hooks |
 | `remember` | Guidance on what/how to store memories |
 | `recall` | Precise and natural language retrieval patterns |
 | `forget` | Safe memory removal workflow |
@@ -89,13 +92,11 @@ Schemas are stored in a `_schema` meta-category within the same database.
 
 ```
 src/
-  server.rs    — MCP server (rmcp 0.14): tool handlers for remember/recall/discover/forget/define
   schema.rs    — Schema system: CategorySchema, SchemaStore, inference, NL query resolution, validation
   llm.rs       — LlmClient trait + AnthropicClient (Claude Haiku) + MockLlmClient for tests
   backend.rs   — MemoryBackend enum: Direct(FerridynDB) | Server(FerridynClient) — unified async API
   lib.rs       — Shared: socket/DB path resolution, table initialization, env var handling
-  cli.rs       — ferridyn-memory-cli binary (clap): discover/recall/remember/forget/define/schema
-  main.rs      — ferridyn-memory binary: MCP server entry point
+  cli.rs       — fmemory binary: CLI with NL-first mode, schema inference, and --json output
   error.rs     — Error types
 ```
 
@@ -123,11 +124,9 @@ This crate depends on `ferridyn-core` and `ferridyn-server` from the [ferridyndb
 
 ### Key crates
 - `ferridyn-core` / `ferridyn-server` — Database engine and client
-- `rmcp` — MCP server framework (Model Context Protocol)
 - `tokio` — Async runtime
 - `reqwest` — HTTP client for Anthropic API calls
 - `clap` — CLI argument parsing
-- `schemars` — JSON Schema generation for MCP tool parameters
 - `regex` — Sort key format validation
 - `indexmap` — Ordered maps for schema segments
 
@@ -138,12 +137,12 @@ This crate depends on `ferridyn-core` and `ferridyn-server` from the [ferridyndb
 | `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference and NL recall |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
 | `FERRIDYN_MEMORY_DB` | No | Override database file path (default: `~/.local/share/ferridyn/memory.db`) |
-| `FERRIDYN_MEMORY_CLI` | No | Override CLI binary path (used by hook scripts) |
+| `FERRIDYN_MEMORY_CLI` | No | Override `fmemory` binary path (used by hook scripts) |
 
 ## Development Process
 
 1. **Build scripts** — `npm run build:scripts` must produce 5 `.mjs` files in `scripts/dist/`
 2. **Build Rust** — `cargo build` must pass
-3. **Test** — `cargo test` must pass (52 tests covering schema validation, LLM mocking, MCP tool handlers, backend operations)
+3. **Test** — `cargo test` must pass (41 tests covering schema validation, LLM mocking, CLI command handlers, backend operations)
 4. **Lint** — `cargo clippy -- -D warnings` must pass
 5. **Format** — `cargo fmt --check` must pass

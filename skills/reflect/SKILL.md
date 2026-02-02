@@ -56,9 +56,8 @@ Look back at the conversation. Identify:
 
 ### Step 2: Check Existing Memories
 
-```
-MCP tool: discover
-  (no category)
+```bash
+fmemory discover
 ```
 
 See what categories exist. Avoid storing duplicates of things already known.
@@ -67,12 +66,10 @@ See what categories exist. Avoid storing duplicates of things already known.
 
 For each learning worth persisting:
 
-```
-MCP tool: remember
-  category: "{appropriate category}"
-  key: "{area}#{topic}"
-  content: "{concise, self-contained description including the WHY}"
-  metadata: "source: reflection, {date}"
+```bash
+fmemory remember --category "{appropriate category}" --key "{area}#{topic}" \
+  --content "{concise, self-contained description including the WHY}" \
+  --metadata "source: reflection, {date}"
 ```
 
 ### Step 4: Summarize

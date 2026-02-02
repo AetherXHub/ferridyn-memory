@@ -26,10 +26,8 @@ Areas:
 
 Before exploring, check if project memories already exist:
 
-```
-MCP tool: recall
-  category: "project"
-  limit: 5
+```bash
+fmemory recall --category "project" --limit 5
 ```
 
 If memories exist, ask the user:
@@ -47,13 +45,12 @@ If "Start fresh": recall all project memories and forget each one.
 
 Ensure the project schema is defined:
 
-```
-MCP tool: define
-  category: "project"
-  description: "Project structure, conventions, architecture, and build knowledge"
-  sort_key_format: "{area}#{topic}"
-  segments: {"area": "knowledge area (structure, conventions, architecture, dependencies, build, patterns)", "topic": "specific topic within the area"}
-  examples: "structure#crate-layout, conventions#naming, architecture#data-flow, dependencies#serde, build#test-commands"
+```bash
+fmemory define --category "project" \
+  --description "Project structure, conventions, architecture, and build knowledge" \
+  --sort_key_format "{area}#{topic}" \
+  --segments '{"area": "knowledge area (structure, conventions, architecture, dependencies, build, patterns)", "topic": "specific topic within the area"}' \
+  --examples "structure#crate-layout, conventions#naming, architecture#data-flow, dependencies#serde, build#test-commands"
 ```
 
 ### Step 2: Explore and Store

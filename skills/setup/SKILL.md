@@ -1,11 +1,11 @@
 ---
 name: setup
-description: Build and configure the FerridynDB memory system — binaries, server, MCP tools, and hooks. Run this once to bootstrap everything.
+description: Build and configure the FerridynDB memory system — binaries, server, CLI, and hooks. Run this once to bootstrap everything.
 ---
 
 # FerridynDB Memory Setup
 
-This is the setup command for the FerridynDB memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate MCP tools.
+This is the setup command for the FerridynDB memory plugin. Run it once after installing the plugin to build binaries, start the server, and activate hooks.
 
 ## Graceful Interrupt Handling
 
@@ -95,12 +95,12 @@ If `cargo` is missing, stop and tell the user:
 
 If `ANTHROPIC_API_KEY` is missing, warn the user:
 
-> **ANTHROPIC_API_KEY is required.** The MCP server uses Claude Haiku for schema inference and natural language recall.
+> **ANTHROPIC_API_KEY is required.** fmemory uses Claude Haiku for schema inference and natural language recall.
 > Set it in your environment:
 > ```
 > export ANTHROPIC_API_KEY="sk-ant-..."
 > ```
-> The MCP server will refuse to start without this key.
+> fmemory will refuse to start without this key.
 
 Use AskUserQuestion:
 
@@ -108,7 +108,7 @@ Use AskUserQuestion:
 
 **Options:**
 1. **I'll set it now** — Pause and wait for user to set the key, then re-check
-2. **Continue anyway** — Setup will complete but MCP server won't start until the key is set
+2. **Continue anyway** — Setup will complete but hooks won't work until the key is set
 
 Save progress after prerequisites pass:
 ```bash
@@ -128,7 +128,7 @@ npm run build:scripts
 If `npm` is missing, warn the user:
 
 > **Node.js is required for hook scripts.** Install Node.js 20+ first.
-> The MCP server (Rust) will work without it, but hooks (auto-retrieval, auto-save, session reflection) will not.
+> The CLI (Rust) will work without it, but hooks (auto-retrieval, auto-save, session reflection) will not.
 
 Build the plugin binaries:
 
@@ -147,12 +147,11 @@ cargo install ferridyn-server --git https://github.com/AetherXHub/ferridyndb
 Confirm the binaries exist:
 
 ```bash
-ls -l "$PLUGIN_ROOT/target/release/ferridyn-memory" \
-      "$PLUGIN_ROOT/target/release/ferridyn-memory-cli"
+ls -l "$PLUGIN_ROOT/target/release/fmemory"
 command -v ferridyn-server >/dev/null 2>&1 && echo "ferridyn-server: OK" || echo "ferridyn-server: MISSING"
 ```
 
-All three must be present. Save progress:
+Both must be present. Save progress:
 ```bash
 save_setup_progress 2
 ```
@@ -168,7 +167,7 @@ Check if the server is already running:
 ```bash
 if [ -S ~/.local/share/ferridyn/server.sock ]; then
   # Socket exists — test if server is responsive
-  timeout 2 "$PLUGIN_ROOT/target/release/ferridyn-memory-cli" discover >/dev/null 2>&1
+  timeout 2 "$PLUGIN_ROOT/target/release/fmemory" discover >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "Server already running and responsive."
   else
@@ -211,9 +210,9 @@ save_setup_progress 3
 Test store, recall, and cleanup:
 
 ```bash
-"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" remember --category _setup-test --key check --content "Setup verification"
-"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" recall --category _setup-test
-"$PLUGIN_ROOT/target/release/ferridyn-memory-cli" forget --category _setup-test --key check
+"$PLUGIN_ROOT/target/release/fmemory" remember --category _setup-test --key check --content "Setup verification"
+"$PLUGIN_ROOT/target/release/fmemory" recall --category _setup-test
+"$PLUGIN_ROOT/target/release/fmemory" forget --category _setup-test --key check
 ```
 
 All three commands must succeed. If any fails, stop and report. Save progress:
@@ -221,32 +220,7 @@ All three commands must succeed. If any fails, stop and report. Save progress:
 save_setup_progress 4
 ```
 
-## Step 5: Activate MCP Server
-
-Write the `.mcp.json` file at the plugin root so Claude Code discovers the MCP server on next restart:
-
-```bash
-cat > "${PLUGIN_ROOT}/.mcp.json" << 'EOF'
-{
-  "mcpServers": {
-    "ferridyn-memory": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/target/release/ferridyn-memory",
-      "env": {
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-      }
-    }
-  }
-}
-EOF
-echo "Wrote .mcp.json to ${PLUGIN_ROOT}/.mcp.json"
-```
-
-Save progress:
-```bash
-save_setup_progress 5
-```
-
-## Step 6: Clear State and Show Welcome
+## Step 5: Clear State and Show Welcome
 
 Clear the setup state file:
 
@@ -263,12 +237,9 @@ SERVER
   Socket:   ~/.local/share/ferridyn/server.sock
   Database: ~/.local/share/ferridyn/memory.db
 
-MCP TOOLS (available after restarting Claude Code)
-  remember  - Store a memory (auto-infers schema on first write)
-  recall    - Retrieve memories (supports natural language queries)
-  discover  - Browse categories with schema descriptions
-  forget    - Remove a specific memory
-  define    - Explicitly define a category's key schema
+CLI
+  fmemory - Command-line interface for memory operations
+  Path: $PLUGIN_ROOT/target/release/fmemory
 
 SKILLS (slash commands)
   /ferridyn-memory:remember  - Guidance on what and how to store
@@ -284,21 +255,18 @@ SKILLS (slash commands)
   /ferridyn-memory:status    - Quick memory overview
   /ferridyn-memory:health    - Memory diagnostics
 
-HOOKS
+HOOKS (activate on next Claude Code restart)
   UserPromptSubmit - Recalls memories + injects proactive memory protocol
   PreCompact       - Saves important learnings before conversation compaction
   Stop             - Reflects on session and persists high-level learnings
 
-CLI (direct access)
-  $PLUGIN_ROOT/target/release/ferridyn-memory-cli
-
 NEXT STEP
-  Restart Claude Code for the MCP server and hooks to take effect.
+  Restart Claude Code for hooks to take effect.
 ```
 
 If `ANTHROPIC_API_KEY` is set in the environment, add:
 
-> **Schema-aware memory is active.** The MCP server uses Claude Haiku for automatic schema inference, key validation, and natural language recall resolution.
+> **Schema-aware memory is active.** fmemory uses Claude Haiku for automatic schema inference, key validation, and natural language recall resolution.
 
 ## Help Text
 
@@ -308,24 +276,23 @@ When user runs `/ferridyn-memory:setup --help`, display:
 FerridynDB Memory Setup
 
 USAGE:
-  /ferridyn-memory:setup         Run full setup (build, server, MCP activation)
+  /ferridyn-memory:setup         Run full setup (build, server, hooks)
   /ferridyn-memory:setup --help  Show this help
 
 WHAT IT DOES:
   1. Checks for Rust toolchain (cargo), Node.js (npm), and ANTHROPIC_API_KEY
   2. Installs npm deps and builds TypeScript hook scripts (tsup)
-  3. Builds plugin binaries and installs ferridyn-server from ferridyndb repo
+  3. Builds CLI binary (fmemory) and installs ferridyn-server from ferridyndb repo
   4. Creates data directory (~/.local/share/ferridyn)
   5. Starts the FerridynDB server daemon
   6. Verifies round-trip memory storage
-  7. Writes .mcp.json to activate MCP tools (with API key passthrough)
 
 PREREQUISITES:
   - Rust toolchain (https://rustup.rs)
   - ANTHROPIC_API_KEY environment variable (for schema inference and NL recall)
 
 AFTER SETUP:
-  Restart Claude Code for MCP tools and hooks to activate.
+  Restart Claude Code for hooks to activate.
 
 For more info: https://github.com/AetherXHub/ferridyn-memory
 ```

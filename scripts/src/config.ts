@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || resolve(__dirname, "../..");
 
 // CLI binary location
-const CLI_BIN = process.env.FERRIDYN_MEMORY_CLI || resolve(PLUGIN_ROOT, "target", "release", "ferridyn-memory-cli");
+const CLI_BIN = process.env.FERRIDYN_MEMORY_CLI || resolve(PLUGIN_ROOT, "target", "release", "fmemory");
 
 /**
  * Execute the ferridyn-memory CLI with the given arguments
@@ -24,7 +24,7 @@ export function runCli(args: string[], options: { timeout?: number } = {}): Prom
   const { timeout = 10_000 } = options;
 
   return new Promise((resolve, reject) => {
-    execFile(CLI_BIN, args, { timeout }, (err, stdout, stderr) => {
+    execFile(CLI_BIN, ["--json", ...args], { timeout }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(`CLI error: ${err.message}\nstderr: ${stderr}`));
         return;

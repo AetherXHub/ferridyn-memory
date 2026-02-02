@@ -39,10 +39,8 @@ You do NOT need to wait for `/ferridyn-memory:decide` — log decisions as they 
 
 Before logging, check if there's an existing decision in the same area:
 
-```
-MCP tool: recall
-  category: "decisions"
-  prefix: "{area}"
+```bash
+fmemory recall --category "decisions" --prefix "{area}"
 ```
 
 If a prior decision exists in the same area, note whether the new decision supersedes, refines, or conflicts with it.
@@ -59,16 +57,13 @@ A well-structured decision memory includes:
 
 ### Step 3: Store
 
-```
-MCP tool: remember
-  category: "decisions"
-  key: "{area}#{decision-name}"
-  content: |
-    Decision: {what was decided}
-    Rationale: {why}
-    Alternatives considered: {what else, why rejected}
-    Constraints: {what shaped this}
-  metadata: "source: conversation, {date}"
+```bash
+fmemory remember --category "decisions" --key "{area}#{decision-name}" \
+  --content "Decision: {what was decided}
+Rationale: {why}
+Alternatives considered: {what else, why rejected}
+Constraints: {what shaped this}" \
+  --metadata "source: conversation, {date}"
 ```
 
 ### Step 4: Confirm

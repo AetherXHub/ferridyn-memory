@@ -29,20 +29,18 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/dist/memory-stats.mjs
 
 This outputs JSON with `total_categories`, `total_entries`, and per-category details (name, description, key_format, entry_count, prefixes, sample_keys).
 
-### Step 1 (Alternative): Manual MCP Discovery
+### Step 1 (Alternative): Manual CLI Discovery
 
-If the stats script is unavailable, use MCP tools directly:
+If the stats script is unavailable, use fmemory directly:
 
-```
-MCP tool: discover
-  (no category)
+```bash
+fmemory discover
 ```
 
 Then for each category:
 
-```
-MCP tool: discover
-  category: "{cat}"
+```bash
+fmemory discover --category "{cat}"
 ```
 
 ### Step 2: Present Summary
@@ -81,9 +79,8 @@ Based on what's in memory, suggest:
 
 Sometimes you just need to know if a specific topic is stored, not a full overview:
 
-```
-MCP tool: recall
-  query: "database configuration"
+```bash
+fmemory "database configuration"
 ```
 
 If results come back → topic is covered.

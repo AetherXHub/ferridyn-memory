@@ -5,7 +5,7 @@ description: Store a memory using the FerridynDB memory system. Guides the agent
 
 # Remember — Store a Memory
 
-Use the MCP `remember` tool to persist knowledge across sessions.
+Use the `fmemory remember` command to persist knowledge across sessions.
 
 ## When to Store
 
@@ -42,23 +42,21 @@ Keys use `#` hierarchy matching the category's schema:
 
 ## Schema Inference
 
-On first write to a **new category**, the server automatically infers a schema from the data. The schema defines the expected key format for future writes.
+On first write to a **new category**, fmemory automatically infers a schema from the data. The schema defines the expected key format for future writes.
 
-If you need a specific key format, use the `define` tool first to explicitly set the schema.
+If you need a specific key format, use `fmemory define` first to explicitly set the schema.
 
 ## Validation
 
-After a schema is set, the server validates keys on every write. If a key doesn't match, you'll get an error explaining the expected format with examples.
+After a schema is set, fmemory validates keys on every write. If a key doesn't match, you'll get an error explaining the expected format with examples.
 
 ## Usage
 
+```bash
+fmemory remember --category "people" --key "toby#email" --content "toby@example.com" --metadata "source: conversation 2025-01-15"
 ```
-MCP tool: remember
-  category: "people"
-  key: "toby#email"
-  content: "toby@example.com"
-  metadata: "source: conversation 2025-01-15" (optional)
-```
+
+The `--metadata` flag is optional.
 
 ## Tips
 

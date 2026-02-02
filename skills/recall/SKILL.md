@@ -5,7 +5,7 @@ description: Retrieve memories from the FerridynDB memory system. Supports preci
 
 # Recall — Retrieve Memories
 
-Use the MCP `recall` tool to retrieve stored knowledge.
+Use the `fmemory recall` command to retrieve stored knowledge.
 
 ## Two Modes
 
@@ -13,31 +13,33 @@ Use the MCP `recall` tool to retrieve stored knowledge.
 
 When you know exactly what to look for:
 
-```
-MCP tool: recall
-  category: "people"
-  prefix: "toby"
+```bash
+fmemory recall --category "people" --prefix "toby"
 ```
 
 This returns all entries in `people` where the key starts with `toby` (e.g. `toby#email`, `toby#role`, `toby#phone`).
 
 Without a prefix, returns all entries in the category:
 
-```
-MCP tool: recall
-  category: "project"
+```bash
+fmemory recall --category "project"
 ```
 
 ### 2. Natural Language Mode (query)
 
 When the user's request implies memory but doesn't specify a category:
 
-```
-MCP tool: recall
-  query: "Toby's email address"
+```bash
+fmemory recall --query "Toby's email address"
 ```
 
-The server sends all known schemas to Claude Haiku, which resolves the query to the right category and prefix. This is the preferred mode for agent-driven memory retrieval.
+Or use the shorthand:
+
+```bash
+fmemory "Toby's email address"
+```
+
+fmemory sends all known schemas to Claude Haiku, which resolves the query to the right category and prefix. This is the preferred mode for agent-driven memory retrieval.
 
 ## When to Use Each Mode
 
@@ -53,9 +55,9 @@ The server sends all known schemas to Claude Haiku, which resolves the query to 
 
 If natural language recall returns no results:
 
-1. Try `discover` (no category) to list all categories
+1. Run `fmemory discover` (no category) to list all categories
 2. Pick the most relevant category
-3. Try `discover` with that category to see key prefixes
+3. Run `fmemory discover --category <cat>` to see key prefixes
 4. Use precise recall with the right prefix
 
 ## Usage in Hooks
@@ -66,8 +68,6 @@ The `memory-retrieval.mjs` hook automatically calls recall with a natural langua
 
 Default limit is 20 results. For bulk retrieval, set a higher limit:
 
-```
-MCP tool: recall
-  category: "project"
-  limit: 100
+```bash
+fmemory recall --category "project" --limit 100
 ```

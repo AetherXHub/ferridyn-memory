@@ -26,17 +26,14 @@ You do NOT need to wait for `/ferridyn-memory:update` — correct stale memories
 
 Use recall to locate the outdated entry:
 
-```
-MCP tool: recall
-  query: "{description of what needs updating}"
+```bash
+fmemory recall --query "{description of what needs updating}"
 ```
 
 Or if you know the exact location:
 
-```
-MCP tool: recall
-  category: "project"
-  prefix: "conventions#naming"
+```bash
+fmemory recall --category "project" --prefix "conventions#naming"
 ```
 
 ### Step 2: Show What Will Change
@@ -53,16 +50,11 @@ Updating memory:
 
 ### Step 3: Replace
 
-```
-MCP tool: forget
-  category: "project"
-  key: "conventions#naming"
-
-MCP tool: remember
-  category: "project"
-  key: "conventions#naming"
-  content: "All modules use kebab-case file names (changed in 2025 refactor)"
-  metadata: "updated: {date}, previous: snake_case convention"
+```bash
+fmemory forget --category "project" --key "conventions#naming"
+fmemory remember --category "project" --key "conventions#naming" \
+  --content "All modules use kebab-case file names (changed in 2025 refactor)" \
+  --metadata "updated: {date}, previous: snake_case convention"
 ```
 
 ### Step 4: Confirm
@@ -75,13 +67,9 @@ After a major refactor, multiple memories may be stale. Handle systematically:
 
 ### Step 1: Audit Relevant Categories
 
-```
-MCP tool: discover
-  (no category)
-
-MCP tool: recall
-  category: "project"
-  limit: 50
+```bash
+fmemory discover
+fmemory recall --category "project" --limit 50
 ```
 
 ### Step 2: Identify Stale Entries
@@ -118,6 +106,6 @@ Example:
 
 ## What NOT to Update
 
-- Schema entries (`_schema` category) — use `define` to change schemas
+- Schema entries (`_schema` category) — use `fmemory define` to change schemas
 - Memories you're uncertain about — ask first
 - Entries that may be intentionally historical ("we chose X over Y in 2024" is still valid even if X changed)

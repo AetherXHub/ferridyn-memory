@@ -24,16 +24,16 @@ Return a JSON array of objects: [{"category": "...", "prefix": "..."}]
 
 const MEMORY_PROTOCOL = `# Memory Protocol
 
-You have access to persistent memory via MCP tools. Use it proactively:
+You have access to persistent memory via the fmemory CLI. Use it proactively:
 
-**COMMIT** — Use the \`remember\` tool when:
+**COMMIT** — Run \`fmemory remember\` when:
 - You make or discuss a significant decision (architecture, technology, design)
 - You learn something important about the project, codebase, or user preferences
 - The user says "remember that...", "note that...", "keep in mind...", or "from now on..."
 - You fix a tricky bug (store the pattern and fix)
 - You discover a convention, gotcha, or non-obvious behavior
 
-**RETRIEVE** — Use the \`recall\` tool when:
+**RETRIEVE** — Run \`fmemory recall\` when:
 - You're starting complex work and need background context
 - You need to know project conventions, architecture decisions, or user preferences
 - The user asks about something that might be stored in memory
@@ -43,7 +43,7 @@ You have access to persistent memory via MCP tools. Use it proactively:
 - Ask the user for the information
 - Store their answer so future sessions have it
 
-**CORRECT** — Use \`forget\` then \`remember\` when:
+**CORRECT** — Run \`fmemory forget\` then \`fmemory remember\` when:
 - Stored information contradicts what you now know
 - The user corrects previously stored information
 - Project structure has changed (after refactors, renames, upgrades)

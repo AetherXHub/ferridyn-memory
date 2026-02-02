@@ -5,15 +5,14 @@ description: Interactively explore the memory structure — list categories, ins
 
 # Browse — Explore Memory Structure
 
-Use the MCP `discover` tool to navigate the memory hierarchy.
+Use the `fmemory discover` command to navigate the memory hierarchy.
 
 ## Exploration Workflow
 
 ### Step 1: List All Categories
 
-```
-MCP tool: discover
-  (no category)
+```bash
+fmemory discover
 ```
 
 Returns all categories with their schema descriptions (if defined):
@@ -25,9 +24,8 @@ Returns all categories with their schema descriptions (if defined):
 
 ### Step 2: Drill Into a Category
 
-```
-MCP tool: discover
-  category: "people"
+```bash
+fmemory discover --category "people"
 ```
 
 Returns sort key prefixes within that category:
@@ -41,10 +39,8 @@ Examples: ["toby#email", "alice#role"]
 
 ### Step 3: Read Specific Entries
 
-```
-MCP tool: recall
-  category: "people"
-  prefix: "toby"
+```bash
+fmemory recall --category "people" --prefix "toby"
 ```
 
 Returns all entries for Toby:

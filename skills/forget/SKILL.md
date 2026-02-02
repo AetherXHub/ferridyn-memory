@@ -5,7 +5,7 @@ description: Remove a specific memory from the FerridynDB memory system. Use whe
 
 # Forget — Remove a Memory
 
-Use the MCP `forget` tool to remove specific memories.
+Use the `fmemory forget` command to remove specific memories.
 
 ## When to Remove
 
@@ -18,14 +18,12 @@ Use the MCP `forget` tool to remove specific memories.
 
 Before deleting, always confirm with the user what will be removed. Show the exact category and key.
 
-For bulk deletion (removing all entries with a prefix), use `discover` first to list what will be affected, then delete one by one after confirmation.
+For bulk deletion (removing all entries with a prefix), use `fmemory discover` first to list what will be affected, then delete one by one after confirmation.
 
 ## Usage
 
-```
-MCP tool: forget
-  category: "people"
-  key: "toby#old-email"
+```bash
+fmemory forget --category "people" --key "toby#old-email"
 ```
 
 ## Workflow: Correct a Memory
@@ -34,10 +32,10 @@ MCP tool: forget
 2. Forget the incorrect entry
 3. Remember the corrected entry
 
-```
-recall → category: "people", prefix: "toby#email"
-forget → category: "people", key: "toby#email"
-remember → category: "people", key: "toby#email", content: "new-email@example.com"
+```bash
+fmemory recall --category "people" --prefix "toby#email"
+fmemory forget --category "people" --key "toby#email"
+fmemory remember --category "people" --key "toby#email" --content "new-email@example.com"
 ```
 
 ## Restrictions

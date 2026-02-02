@@ -11,9 +11,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::error::MemoryError;
 use indexmap::IndexMap;
 use regex::Regex;
-use rmcp::ErrorData;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::warn;
@@ -81,16 +81,15 @@ impl SchemaStore {
     }
 
     /// Retrieve the schema for a category, if one exists.
-    pub async fn get_schema(&self, category: &str) -> Result<Option<CategorySchema>, ErrorData> {
+    pub async fn get_schema(&self, category: &str) -> Result<Option<CategorySchema>, MemoryError> {
         let item = self.backend.get_item(SCHEMA_CATEGORY, category).await?;
         match item {
             Some(doc) => {
                 let content = doc["content"]
                     .as_str()
-                    .ok_or_else(|| ErrorData::internal_error("Schema missing content", None))?;
-                let schema: CategorySchema = serde_json::from_str(content).map_err(|e| {
-                    ErrorData::internal_error(format!("Schema parse error: {e}"), None)
-                })?;
+                    .ok_or_else(|| MemoryError::Internal("Schema missing content".to_string()))?;
+                let schema: CategorySchema = serde_json::from_str(content)
+                    .map_err(|e| MemoryError::Internal(format!("Schema parse error: {e}")))?;
                 Ok(Some(schema))
             }
             None => Ok(None),
@@ -102,9 +101,9 @@ impl SchemaStore {
         &self,
         category: &str,
         schema: &CategorySchema,
-    ) -> Result<(), ErrorData> {
+    ) -> Result<(), MemoryError> {
         let content = serde_json::to_string(schema)
-            .map_err(|e| ErrorData::internal_error(format!("Schema serialize error: {e}"), None))?;
+            .map_err(|e| MemoryError::Internal(format!("Schema serialize error: {e}")))?;
 
         let doc = serde_json::json!({
             "category": SCHEMA_CATEGORY,
@@ -121,12 +120,12 @@ impl SchemaStore {
     }
 
     /// Check whether a category has a schema defined.
-    pub async fn has_schema(&self, category: &str) -> Result<bool, ErrorData> {
+    pub async fn has_schema(&self, category: &str) -> Result<bool, MemoryError> {
         Ok(self.get_schema(category).await?.is_some())
     }
 
     /// List all defined schemas as `(category_name, schema)` pairs.
-    pub async fn list_schemas(&self) -> Result<Vec<(String, CategorySchema)>, ErrorData> {
+    pub async fn list_schemas(&self) -> Result<Vec<(String, CategorySchema)>, MemoryError> {
         let items = self.backend.query(SCHEMA_CATEGORY, None, 1000).await?;
         let mut schemas = Vec::new();
 
@@ -149,7 +148,7 @@ impl SchemaStore {
         let schema = self
             .get_schema(category)
             .await
-            .map_err(|e| format!("Failed to read schema: {}", e.message))?;
+            .map_err(|e| format!("Failed to read schema: {e}"))?;
 
         let schema = match schema {
             Some(s) => s,

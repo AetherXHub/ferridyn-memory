@@ -34,48 +34,42 @@ Before starting work, ask yourself:
 
 Use natural language recall for broad context:
 
+```bash
+fmemory recall --query "{description of what you need to know}"
 ```
-MCP tool: recall
-  query: "{description of what you need to know}"
+
+Or use the shorthand:
+
+```bash
+fmemory "{description of what you need to know}"
 ```
 
 Or use precise recall if you know the category:
 
-```
-MCP tool: recall
-  category: "project"
-  prefix: "conventions"
+```bash
+fmemory recall --category "project" --prefix "conventions"
 ```
 
 For multiple areas, make multiple calls:
 
-```
-MCP tool: recall
-  category: "decisions"
-  prefix: "auth"
-
-MCP tool: recall
-  category: "preferences"
-
-MCP tool: recall
-  category: "bugs"
-  prefix: "auth"
+```bash
+fmemory recall --category "decisions" --prefix "auth"
+fmemory recall --category "preferences"
+fmemory recall --category "bugs" --prefix "auth"
 ```
 
 ### Step 3: Browse If Needed
 
 If recall doesn't find enough context, browse the full structure:
 
-```
-MCP tool: discover
-  (no category)
+```bash
+fmemory discover
 ```
 
 Then drill into relevant categories:
 
-```
-MCP tool: discover
-  category: "project"
+```bash
+fmemory discover --category "project"
 ```
 
 ### Step 4: Handle Missing Knowledge (Critical)
@@ -89,12 +83,9 @@ Examples:
 
 After the user answers, **store it immediately**:
 
-```
-MCP tool: remember
-  category: "project"
-  key: "conventions#error-handling"
-  content: "{user's answer}"
-  metadata: "source: user clarification, {date}"
+```bash
+fmemory remember --category "project" --key "conventions#error-handling" \
+  --content "{user's answer}" --metadata "source: user clarification, {date}"
 ```
 
 This way, no future session needs to ask the same question.

@@ -4,7 +4,7 @@ Persistent, schema-aware memory for Claude Code backed by [FerridynDB](https://g
 
 ## What It Does
 
-- **5 MCP tools** — `remember`, `recall`, `discover`, `forget`, `define` available directly in Claude
+- **CLI interface** — `fmemory` command with 6 subcommands plus natural-language-first mode available to Claude via Bash
 - **3 hooks** — auto-retrieve context before each prompt, save learnings before compaction, reflect on sessions at exit
 - **13 skills** — proactive agent behaviors (teach, reflect, context, update, decide, status) plus core workflows (setup, remember, recall, forget, browse, learn, health)
 - **Schema-aware** — Claude Haiku auto-infers category schemas on first write, validates keys, and resolves natural language queries
@@ -27,9 +27,8 @@ After installing, run `/ferridyn-memory:setup` to build binaries, start the serv
 3. Build Rust release binaries and install `ferridyn-server`
 4. Create data directory and start the server daemon
 5. Verify round-trip memory storage
-6. Write `.mcp.json` to activate MCP tools
 
-Restart Claude Code after setup for MCP tools and hooks to take effect.
+Restart Claude Code after setup for hooks to take effect.
 
 ## Architecture
 
@@ -37,11 +36,10 @@ Restart Claude Code after setup for MCP tools and hooks to take effect.
 ferridyn-server (background daemon, owns DB file)
     ^ Unix socket (~/.local/share/ferridyn/server.sock)
     |
-    +-- ferridyn-memory     (MCP server, provides tools to Claude)
-    +-- ferridyn-memory-cli (used by hook scripts for read/write)
+    +-- fmemory          (CLI: human use, hooks, Claude via Bash)
 ```
 
-The MCP server and CLI try the server socket first. If unavailable, they fall back to opening the database file directly (exclusive file lock).
+The CLI tries the server socket first. If unavailable, it falls back to opening the database file directly (exclusive file lock).
 
 ### Schema-Aware Memory
 
@@ -51,15 +49,19 @@ Each category can have a schema defining its sort key format:
 - **Validation** — Subsequent writes are checked against the expected key format
 - **NL resolution** — Natural language queries like "Toby's email" resolve to `category=people, prefix=toby`
 
-## MCP Tools
+## CLI Commands
 
-| Tool | Purpose |
-|------|---------|
+The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
+
+| Command | Purpose |
+|---------|---------|
 | `remember` | Store a memory (auto-infers schema on first write) |
 | `recall` | Retrieve memories by category+prefix or natural language query |
 | `discover` | Browse categories with schema descriptions, drill into key prefixes |
 | `forget` | Remove a specific memory by category and key |
 | `define` | Explicitly define or update a category's key schema |
+| `schema` | View schema for a category |
+| NL-first mode | `fmemory "natural language query"` — resolves to recall or other command |
 
 ## Hooks
 
@@ -75,7 +77,7 @@ Each category can have a schema defining its sort key format:
 
 | Skill | Purpose |
 |-------|---------|
-| `/ferridyn-memory:setup` | Build, start server, activate MCP tools and hooks |
+| `/ferridyn-memory:setup` | Build, start server, activate hooks |
 | `/ferridyn-memory:remember` | Guidance on what and how to store |
 | `/ferridyn-memory:recall` | Precise and natural language retrieval |
 | `/ferridyn-memory:forget` | Safe memory removal workflow |
@@ -101,18 +103,16 @@ Each category can have a schema defining its sort key format:
 | `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference, NL recall, and hook scripts |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
 | `FERRIDYN_MEMORY_DB` | No | Override database file path (default: `~/.local/share/ferridyn/memory.db`) |
-| `FERRIDYN_MEMORY_CLI` | No | Override CLI binary path (used by hook scripts) |
+| `FERRIDYN_MEMORY_CLI` | No | Override `fmemory` binary path (used by hook scripts) |
 
 ## Project Structure
 
 ```
 src/
-  server.rs           — MCP server (rmcp): tool handlers
   schema.rs           — Schema system: inference, validation, NL resolution
   llm.rs              — LLM client (Claude Haiku) + mock for tests
   backend.rs          — MemoryBackend: Direct(FerridynDB) | Server(FerridynClient)
-  cli.rs              — ferridyn-memory-cli binary
-  main.rs             — MCP server entry point
+  cli.rs              — fmemory binary: CLI with NL-first mode and --json output
   lib.rs              — Shared utilities
 scripts/
   src/                — TypeScript source (compiled by tsup)
@@ -136,7 +136,7 @@ hooks/hooks.json      — Hook configuration
 npm install                       # install tsup + typescript
 npm run build:scripts             # compile TypeScript hooks to scripts/dist/
 cargo build                       # compile Rust binaries
-cargo test                        # run tests (52 tests)
+cargo test                        # run tests (41 tests)
 cargo clippy -- -D warnings       # lint
 cargo fmt --check                 # check formatting
 ```

@@ -31,24 +31,20 @@ Extract from the user's statement:
 
 ### Step 2: Check Existing Categories
 
-```
-MCP tool: discover
-  (no category)
+```bash
+fmemory discover
 ```
 
 See what categories already exist. Prefer reusing existing categories over creating new ones.
 
 ### Step 3: Store the Memory
 
-```
-MCP tool: remember
-  category: "{inferred category}"
-  key: "{inferred key}"
-  content: "{extracted content}"
-  metadata: "source: user taught, {date}"
+```bash
+fmemory remember --category "{inferred category}" --key "{inferred key}" \
+  --content "{extracted content}" --metadata "source: user taught, {date}"
 ```
 
-If the category is new, `remember` will auto-infer a schema from your first write.
+If the category is new, fmemory will auto-infer a schema from your first write.
 
 ### Step 4: Confirm
 
@@ -80,9 +76,9 @@ Tell the user what you stored and how you categorized it. Keep it brief:
 
 If the user says "actually, it's X not Y" and there's an existing memory with the wrong value:
 
-1. Use `recall` to find the old entry
-2. Use `forget` to remove it
-3. Use `remember` to store the corrected value
+1. Use `fmemory recall` to find the old entry
+2. Use `fmemory forget` to remove it
+3. Use `fmemory remember` to store the corrected value
 4. Confirm: "Updated **people**: `toby#email` from old@example.com to new@example.com"
 
 This is equivalent to the `/ferridyn-memory:update` skill but triggered conversationally.
