@@ -1,11 +1,13 @@
 # FerridynDB Memory Plugin for Claude Code
 
-Self-contained Claude Code plugin that provides:
+Persistent, schema-aware memory for Claude Code backed by [FerridynDB](https://github.com/AetherXHub/ferridyndb). Memories survive across sessions and conversation compactions — decisions, contacts, project knowledge, patterns, and preferences are stored locally and recalled automatically.
 
-1. **MCP server** — `remember`, `recall`, `discover`, `forget` tools available directly in Claude
-2. **Auto-retrieval hook** (UserPromptSubmit) — automatically injects relevant memories into context before Claude processes each prompt
-3. **Auto-save hook** (PreCompact) — extracts and persists important learnings before conversation compaction
-4. **Setup skill** — `/ferridyn-memory:setup` bootstraps the entire system
+## What It Does
+
+- **5 MCP tools** — `remember`, `recall`, `discover`, `forget`, `define` available directly in Claude
+- **3 hooks** — auto-retrieve context before each prompt, save learnings before compaction, reflect on sessions at exit
+- **13 skills** — proactive agent behaviors (teach, reflect, context, update, decide, status) plus core workflows (setup, remember, recall, forget, browse, learn, health)
+- **Schema-aware** — Claude Haiku auto-infers category schemas on first write, validates keys, and resolves natural language queries
 
 ## Install
 
@@ -14,48 +16,127 @@ Self-contained Claude Code plugin that provides:
 /plugin marketplace add AetherXHub/ferridyn-memory
 ```
 
-After installing, run `/ferridyn-memory:setup` to build binaries, start the server, and verify everything works.
+After installing, run `/ferridyn-memory:setup` to build binaries, start the server, and activate everything.
 
 ## Setup
 
-Run `/ferridyn-memory:setup` in Claude Code. It will:
+`/ferridyn-memory:setup` handles the full bootstrap:
 
-1. Build the release binaries
-2. Start the FerridynDB server
-3. Verify the CLI and MCP tools work
-4. Test a round-trip memory store/recall/forget
+1. Check prerequisites (Rust toolchain, Node.js, `ANTHROPIC_API_KEY`)
+2. Install npm dependencies and build TypeScript hook scripts (`tsup`)
+3. Build Rust release binaries and install `ferridyn-server`
+4. Create data directory and start the server daemon
+5. Verify round-trip memory storage
+6. Write `.mcp.json` to activate MCP tools
+
+Restart Claude Code after setup for MCP tools and hooks to take effect.
 
 ## Architecture
 
 ```
-ferridyn-server (background, owns DB file)
+ferridyn-server (background daemon, owns DB file)
     ^ Unix socket (~/.local/share/ferridyn/server.sock)
     |
-    +-- ferridyn-memory (MCP server, provides tools to Claude)
-    +-- ferridyn-memory-cli (used by hooks for read/write)
+    +-- ferridyn-memory     (MCP server, provides tools to Claude)
+    +-- ferridyn-memory-cli (used by hook scripts for read/write)
 ```
+
+The MCP server and CLI try the server socket first. If unavailable, they fall back to opening the database file directly (exclusive file lock).
+
+### Schema-Aware Memory
+
+Each category can have a schema defining its sort key format:
+
+- **Auto-inference** — On first write to a new category, Claude Haiku infers the schema
+- **Validation** — Subsequent writes are checked against the expected key format
+- **NL resolution** — Natural language queries like "Toby's email" resolve to `category=people, prefix=toby`
+
+## MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `remember` | Store a memory (auto-infers schema on first write) |
+| `recall` | Retrieve memories by category+prefix or natural language query |
+| `discover` | Browse categories with schema descriptions, drill into key prefixes |
+| `forget` | Remove a specific memory by category and key |
+| `define` | Explicitly define or update a category's key schema |
 
 ## Hooks
 
-- **memory-retrieval.mjs** (UserPromptSubmit): Discovers stored memories, selects relevant ones (using Claude Haiku if ANTHROPIC_API_KEY is set, or fetches all as fallback), injects as `additionalContext`
-- **memory-commit.mjs** (PreCompact): Reads recent transcript, uses Claude Haiku to extract key learnings, stores them as memories
+| Hook | Event | Script | Purpose |
+|------|-------|--------|---------|
+| Auto-retrieval | UserPromptSubmit | `memory-retrieval.ts` | Select and inject relevant memories before each prompt. Injects the **Memory Protocol** — behavioral guidance for proactive memory use. |
+| Auto-save | PreCompact | `memory-commit.ts` | Extract key learnings from the transcript before context compaction |
+| Session reflect | Stop | `memory-reflect.ts` | Reflect on the full session and persist high-level decisions, patterns, and preferences |
+
+## Skills
+
+### Core (user-invoked)
+
+| Skill | Purpose |
+|-------|---------|
+| `/ferridyn-memory:setup` | Build, start server, activate MCP tools and hooks |
+| `/ferridyn-memory:remember` | Guidance on what and how to store |
+| `/ferridyn-memory:recall` | Precise and natural language retrieval |
+| `/ferridyn-memory:forget` | Safe memory removal workflow |
+| `/ferridyn-memory:browse` | Interactive memory exploration |
+| `/ferridyn-memory:learn` | Deep codebase exploration that builds persistent project memory |
+| `/ferridyn-memory:health` | Memory integrity diagnostics |
+
+### Proactive (agent auto-triggered + user-invokable)
+
+| Skill | Auto-Trigger | Purpose |
+|-------|-------------|---------|
+| `/ferridyn-memory:teach` | "remember that...", "note that...", "from now on..." | Parse natural language into structured memory |
+| `/ferridyn-memory:reflect` | After completing significant work | Extract decisions, patterns, gotchas |
+| `/ferridyn-memory:context` | Before starting complex work | Pull relevant memories; ask and store if missing |
+| `/ferridyn-memory:update` | When stored info contradicts current knowledge | Find and replace stale memories |
+| `/ferridyn-memory:decide` | When a significant decision is made | Log decision with rationale and alternatives |
+| `/ferridyn-memory:status` | Session start | Quick overview of memory contents |
 
 ## Configuration
 
-- `FERRIDYN_MEMORY_CLI` — override CLI binary path
-- `FERRIDYN_MEMORY_SOCKET` — override server socket path
-- `ANTHROPIC_API_KEY` — enables intelligent memory selection/extraction via Claude Haiku
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference, NL recall, and hook scripts |
+| `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
+| `FERRIDYN_MEMORY_DB` | No | Override database file path (default: `~/.local/share/ferridyn/memory.db`) |
+| `FERRIDYN_MEMORY_CLI` | No | Override CLI binary path (used by hook scripts) |
 
-## Plugin Structure
+## Project Structure
 
 ```
-(repo root)
-  .claude-plugin/plugin.json   — plugin metadata
-  .mcp.json                    — MCP server declaration
-  hooks/hooks.json             — hook configuration
-  scripts/
-    config.mjs                 — shared utilities
-    memory-retrieval.mjs       — auto-retrieval hook
-    memory-commit.mjs          — auto-save hook
-  skills/setup/SKILL.md        — /ferridyn-memory:setup
+src/
+  server.rs           — MCP server (rmcp): tool handlers
+  schema.rs           — Schema system: inference, validation, NL resolution
+  llm.rs              — LLM client (Claude Haiku) + mock for tests
+  backend.rs          — MemoryBackend: Direct(FerridynDB) | Server(FerridynClient)
+  cli.rs              — ferridyn-memory-cli binary
+  main.rs             — MCP server entry point
+  lib.rs              — Shared utilities
+scripts/
+  src/                — TypeScript source (compiled by tsup)
+    config.ts         — Shared: CLI runner, Haiku caller, JSON extraction
+    types.ts          — Shared type definitions
+    memory-retrieval.ts   — UserPromptSubmit hook
+    memory-commit.ts      — PreCompact hook
+    memory-reflect.ts     — Stop hook
+    memory-health.ts      — Diagnostics utility
+    memory-stats.ts       — Stats utility
+  dist/               — Built output (.mjs), produced by npm run build:scripts
+skills/               — 13 skill definitions (SKILL.md files)
+commands/             — 13 command definitions (.md files)
+hooks/hooks.json      — Hook configuration
+.claude-plugin/       — Plugin metadata
+```
+
+## Development
+
+```bash
+npm install                       # install tsup + typescript
+npm run build:scripts             # compile TypeScript hooks to scripts/dist/
+cargo build                       # compile Rust binaries
+cargo test                        # run tests (52 tests)
+cargo clippy -- -D warnings       # lint
+cargo fmt --check                 # check formatting
 ```
