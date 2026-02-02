@@ -7,7 +7,8 @@ import {
   parseJsonFromText,
   readStdin,
   readTranscriptTail,
-} from "./config.mjs";
+} from "./config.js";
+import type { HookInput, ExtractedMemory, TranscriptEntry } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Prompts
@@ -39,8 +40,8 @@ Guidelines:
 // Main
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const input = await readStdin();
+async function main(): Promise<void> {
+  const input: HookInput = await readStdin();
   const transcriptPath = input.transcript_path;
 
   if (!transcriptPath) {
@@ -48,15 +49,18 @@ async function main() {
   }
 
   // Step 1: Read recent transcript entries.
-  const entries = await readTranscriptTail(transcriptPath, 50);
+  const entries: TranscriptEntry[] = await readTranscriptTail(
+    transcriptPath,
+    50,
+  );
   if (entries.length === 0) {
     process.exit(0);
   }
 
   // Step 2: Get existing categories for context.
-  let categories = [];
+  let categories: string[] = [];
   try {
-    const cats = await runCli(["discover"]);
+    const cats = (await runCli(["discover"])) as string[];
     if (Array.isArray(cats)) {
       categories = cats.map((c) => (typeof c === "string" ? c : String(c)));
     }
@@ -100,7 +104,7 @@ async function main() {
     systemPrompt,
     `Conversation transcript:\n${conversationText}`,
   );
-  const memories = parseJsonFromText(llmResponse);
+  const memories = parseJsonFromText(llmResponse ?? "") as ExtractedMemory[];
 
   if (!Array.isArray(memories) || memories.length === 0) {
     process.stderr.write("memory-commit: no memories extracted\n");
@@ -126,9 +130,10 @@ async function main() {
       }
       await runCli(args);
       stored++;
-    } catch (err) {
+    } catch (err: unknown) {
+      const error = err as Error;
       process.stderr.write(
-        `memory-commit: failed to store ${mem.category}#${mem.key}: ${err.message}\n`,
+        `memory-commit: failed to store ${mem.category}#${mem.key}: ${error.message}\n`,
       );
     }
   }
@@ -136,7 +141,7 @@ async function main() {
   process.stderr.write(`memory-commit: stored ${stored} memories\n`);
 }
 
-main().catch((err) => {
+main().catch((err: Error) => {
   process.stderr.write(`memory-commit error: ${err.message}\n`);
   // Exit 0 so we don't block compaction.
   process.exit(0);
