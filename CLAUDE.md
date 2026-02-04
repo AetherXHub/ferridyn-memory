@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-fmemory is a CLI tool for persistent, structured memory backed by the FerridynDB database server. It stores and retrieves memories with typed attributes and secondary indexes, organized into 7 predefined categories. Uses Claude Haiku (`claude-haiku-4-5`) for natural language parsing and query resolution.
+fmemory is a CLI tool for persistent, structured memory backed by the FerridynDB database server. It stores and retrieves memories with typed attributes and secondary indexes, organized into 9 predefined categories. Supports TTL-based expiration for short-term memory (STM) with automatic promotion to long-term memory (LTM). Uses Claude Haiku (`claude-haiku-4-5`) for natural language parsing and query resolution.
 
 The companion Claude Code plugin lives at [ferridyn-memory-plugin](https://github.com/AetherXHub/ferridyn-memory-plugin).
 
@@ -12,7 +12,7 @@ The companion Claude Code plugin lives at [ferridyn-memory-plugin](https://githu
 
 - `cargo build` — compile the fmemory binary
 - `cargo build --release` — release build
-- `cargo test` — run all tests (32 tests)
+- `cargo test` — run all tests (55 tests)
 - `cargo clippy -- -D warnings` — lint
 - `cargo fmt --check` — check formatting
 
@@ -35,17 +35,19 @@ The `memories` table uses `category` as partition key and `key` as sort key.
 
 ### Predefined Categories
 
-7 categories are codified at compile time in `PREDEFINED_SCHEMAS` (schema.rs). Every item gets a `created_at` timestamp (ISO 8601, UTC) injected automatically before storage.
+9 categories are codified at compile time in `PREDEFINED_SCHEMAS` (schema.rs). Every item gets a `created_at` timestamp (ISO 8601, UTC) injected automatically before storage, and an `expires_at` timestamp when applicable (TTL).
 
 | Category | Description | Indexed Attributes |
 |----------|-------------|--------------------|
-| project | Codebase knowledge — architecture, conventions, gotchas | area, topic |
-| decisions | Architectural and design decisions with rationale | domain |
-| contacts | People — names, roles, contact info | name, email, role, team |
-| preferences | User preferences, workflow patterns, directives | scope |
-| bugs | Bug patterns, root causes, fixes, workarounds | area |
-| tools | Endpoints, configs, infrastructure, CI/CD, environments | kind, name |
-| notes | General-purpose catch-all | topic |
+| `project` | Domain knowledge — structure, patterns, key facts | area, topic |
+| `decisions` | Decisions with rationale — what was chosen and why | domain |
+| `contacts` | People — names, roles, contact info | name, email, role, team |
+| `preferences` | User preferences, workflow patterns, directives | scope |
+| `issues` | Problems and their resolutions — symptoms, causes, fixes | area |
+| `tools` | Tools, services, resources, infrastructure | kind, name |
+| `events` | Appointments, deadlines, scheduled events | date, title |
+| `notes` | General-purpose catch-all | topic |
+| `scratchpad` | Ephemeral working memory — observations and quick captures (24h default TTL) | topic |
 
 Custom categories can be added with `fmemory define`.
 
@@ -65,14 +67,15 @@ Five LLM prompt constants drive the system. All use `claude-haiku-4-5` with 2048
 
 The `remember` command follows this flow:
 
-1. **Auto-init**: If no schemas exist yet, `auto_init()` creates all 7 predefined schemas and their indexes
+1. **Auto-init**: If no schemas exist yet, `auto_init()` creates all 9 predefined schemas and their indexes
 2. **Category resolution**:
    - `--category` provided: validates it has a schema; errors with available categories if not
    - No `--category`: calls `parse_to_document_with_category()` — LLM picks from predefined list and parses in one call
 3. **Document parsing**: If `--category` was provided, `parse_to_document()` parses input against the existing schema
 4. **`created_at` injection**: Current UTC ISO 8601 timestamp is injected before storage
-5. **Key resolution**: `--key` flag > LLM-parsed `"key"` field > `"unknown"`
-6. **Storage**: `put_item()` stores the document
+5. **`expires_at` injection**: If `--ttl` flag is set, computes expiry from now + duration. Scratchpad items auto-get 24h TTL. Events items auto-compute TTL from `date` attribute.
+6. **Key resolution**: `--key` flag > LLM-parsed `"key"` field > `"unknown"`
+7. **Storage**: `put_item()` stores the document
 
 The `-p` prompt mode follows the same flow after intent classification routes to "remember".
 
@@ -90,16 +93,18 @@ NL queries (`--query` or `-p` in recall mode) go through:
 | Command | Purpose | Requires API key |
 |---------|---------|-----------------|
 | `init` | Create all predefined category schemas (idempotent) | No |
-| `remember` | Store a memory (auto-selects category from predefined list) | Yes (always) |
+| `remember` | Store a memory (auto-selects category from predefined list), supports `--ttl` flag | Yes (always) |
 | `recall --category` | Retrieve by category, optional `--key` | No |
 | `recall --query` | NL query with index-optimized resolution | Yes |
 | `discover` | Browse categories, schemas, and indexes | No |
 | `forget` | Remove a specific memory (`--category` and `--key` required) | No |
 | `define` | Create a custom category schema with typed attributes | No |
 | `schema` | View schema and indexes (single category or all) | No |
+| `promote` | Promote STM → LTM (remove TTL), optionally re-categorize | Yes (if --to) |
+| `prune` | Delete all expired memories | No |
 | `-p` prompt | NL prompt — classifies intent, routes to remember or recall | Yes |
 
-Global flags: `--json` (machine-readable JSON to stdout), `-p`/`--prompt` (NL mode).
+Global flags: `--json` (machine-readable JSON to stdout), `-p`/`--prompt` (NL mode), `--include-expired` (show expired items in results).
 
 ### Output Conventions
 
@@ -121,9 +126,11 @@ src/
                  + MockLlmClient for tests. LlmError: MissingApiKey, Http, Parse, EmptyResponse.
   backend.rs   — MemoryBackend enum: Server(FerridynClient) + Direct(FerridynDB, #[cfg(test)] only)
                  16 methods: CRUD + schema/index operations + ensure_predefined_schemas()
+  ttl.rs       — TTL support: parse_ttl(), compute_expires_at(), is_expired(), filter_expired(),
+                 auto_ttl_from_date(), SCRATCHPAD_DEFAULT_TTL
   lib.rs       — TABLE_NAME ("memories"), resolve_socket_path(), ensure_memories_table_via_server(),
                  re-exports: AttributeDefInput, AttributeInfo, IndexInfo, PartitionSchemaInfo,
-                 QueryResult, PredefinedCategory, SchemaDefinition, PREDEFINED_SCHEMAS
+                 QueryResult, PredefinedCategory, SchemaDefinition, PREDEFINED_SCHEMAS, ttl module
   error.rs     — MemoryError: Server, ServerUnavailable, Schema, Index, InvalidParams, Internal
 ```
 
@@ -133,7 +140,7 @@ src/
 
 **PredefinedCategory** (schema.rs): `name: &'static str`, `description: &'static str`, `attributes: &'static [StaticAttributeDef]`, `indexed_attributes: &'static [&'static str]`. Has `to_definition() -> SchemaDefinition` converter.
 
-**PREDEFINED_SCHEMAS** (schema.rs): `&[PredefinedCategory]` — compile-time constant defining all 7 built-in categories with their attributes and indexes.
+**PREDEFINED_SCHEMAS** (schema.rs): `&[PredefinedCategory]` — compile-time constant defining all 9 built-in categories with their attributes and indexes.
 
 **ResolvedQuery** (schema.rs): `IndexLookup { category, index_name, key_value }` | `PartitionScan { category, key_prefix: Option }` | `ExactLookup { category, key }`.
 
@@ -156,7 +163,7 @@ Schema: `create_schema`, `describe_schema`, `list_schemas`, `drop_schema`.
 
 Index: `create_index`, `list_indexes`, `describe_index`, `drop_index`, `query_index`.
 
-Predefined: `ensure_predefined_schemas()` — creates all 7 predefined categories and their indexes (idempotent).
+Predefined: `ensure_predefined_schemas()` — creates all 9 predefined categories and their indexes (idempotent).
 
 ## Dependencies
 
@@ -168,7 +175,7 @@ This crate depends on `ferridyn-server` from [ferridyndb](https://github.com/Aet
 - `tokio` — Async runtime
 - `reqwest` — HTTP client for Anthropic API calls
 - `clap` — CLI argument parsing
-- `chrono` — Date/time resolution and `created_at` timestamp injection
+- `chrono` — Date/time resolution, `created_at` and `expires_at` timestamp handling, TTL computation
 
 ## Environment Variables
 
@@ -177,9 +184,41 @@ This crate depends on `ferridyn-server` from [ferridyndb](https://github.com/Aet
 | `ANTHROPIC_API_KEY` | For NL features | Claude Haiku for NL parsing, query resolution, answer synthesis. Not needed for init, discover, forget, schema, or recall by category/key. |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
 
+## TTL and Memory Tiers
+
+Items can have an `expires_at` attribute (RFC 3339 timestamp). Client-side filtering removes expired items on read. FerridynDB has no native TTL — this is purely application-level.
+
+### Short-Term Memory (STM) vs Long-Term Memory (LTM)
+
+- **STM**: Items with `expires_at` set — they will expire and be cleaned up
+- **LTM**: Items without `expires_at` — they persist indefinitely
+
+### TTL Behavior by Category
+
+| Category | Default TTL | Behavior |
+|----------|-------------|----------|
+| `scratchpad` | 24 hours | Auto-set on every store unless `--ttl` overrides |
+| `events` | End of event date | Auto-computed from `date` attribute |
+| All others | None (LTM) | Set manually with `--ttl` flag |
+
+### TTL Flags
+
+- `--ttl <duration>` on `remember`: Sets TTL. Formats: `1h`, `24h`, `7d`, `30d`, `2w`.
+- `--include-expired` (global): Include expired items in query results (debugging).
+
+### Promotion (STM → LTM)
+
+`fmemory promote --category scratchpad --key meeting-notes` removes `expires_at`, making the item permanent.
+
+`fmemory promote --category scratchpad --key meeting-notes --to decisions` re-categorizes via LLM re-parsing, removing TTL in the process.
+
+### Pruning
+
+`fmemory prune` deletes all expired items across all categories. `fmemory prune --category scratchpad` limits to one category.
+
 ## Development Process
 
 1. **Build** — `cargo build` must pass
-2. **Test** — `cargo test` must pass (32 tests covering predefined schemas, NL parsing, intent classification, query resolution, answer synthesis, backend operations)
+2. **Test** — `cargo test` must pass (55 tests covering predefined schemas, NL parsing, intent classification, query resolution, answer synthesis, backend operations, TTL functionality)
 3. **Lint** — `cargo clippy -- -D warnings` must pass
 4. **Format** — `cargo fmt --check` must pass

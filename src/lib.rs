@@ -4,6 +4,7 @@ pub mod backend;
 pub mod error;
 pub mod llm;
 pub mod schema;
+pub mod ttl;
 
 use std::path::PathBuf;
 
@@ -17,6 +18,12 @@ pub use ferridyn_server::client::{
 
 // Re-export predefined schema types.
 pub use schema::{PREDEFINED_SCHEMAS, PredefinedCategory, SchemaDefinition};
+
+// Re-export TTL utilities.
+pub use ttl::{
+    SCRATCHPAD_DEFAULT_TTL, auto_ttl_from_date, compute_expires_at, filter_expired, is_expired,
+    parse_ttl,
+};
 
 /// Resolve the socket path from env var or default location.
 pub fn resolve_socket_path() -> PathBuf {

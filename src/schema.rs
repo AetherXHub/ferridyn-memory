@@ -87,23 +87,23 @@ impl PredefinedCategory {
     }
 }
 
-/// The 7 predefined memory categories.
+/// The 9 predefined memory categories.
 ///
-/// Every schema includes `created_at` (STRING, not required) which is auto-injected at write time.
+/// Every schema includes `expires_at` and `created_at` (STRING, not required) which are auto-injected at write time.
 pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
     PredefinedCategory {
         name: "project",
-        description: "Codebase knowledge — architecture, conventions, gotchas, structure",
+        description: "Domain knowledge — structure, patterns, key facts",
         attributes: &[
-            StaticAttributeDef {
-                name: "area",
-                attr_type: "STRING",
-                required: true,
-            },
             StaticAttributeDef {
                 name: "topic",
                 attr_type: "STRING",
-                required: true,
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "area",
+                attr_type: "STRING",
+                required: false,
             },
             StaticAttributeDef {
                 name: "details",
@@ -112,6 +112,11 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
             },
             StaticAttributeDef {
                 name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
                 attr_type: "STRING",
                 required: false,
             },
@@ -125,22 +130,22 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
     },
     PredefinedCategory {
         name: "decisions",
-        description: "Architectural and design decisions with rationale",
+        description: "Decisions with rationale — what was chosen and why",
         attributes: &[
             StaticAttributeDef {
                 name: "title",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "domain",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "decision",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "rationale",
@@ -148,22 +153,12 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
                 required: false,
             },
             StaticAttributeDef {
-                name: "alternatives",
-                attr_type: "STRING",
-                required: false,
-            },
-            StaticAttributeDef {
-                name: "constraints",
-                attr_type: "STRING",
-                required: false,
-            },
-            StaticAttributeDef {
-                name: "supersedes",
-                attr_type: "STRING",
-                required: false,
-            },
-            StaticAttributeDef {
                 name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
                 attr_type: "STRING",
                 required: false,
             },
@@ -182,7 +177,7 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
             StaticAttributeDef {
                 name: "name",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "email",
@@ -210,6 +205,11 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
                 required: false,
             },
             StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
                 name: "created_at",
                 attr_type: "STRING",
                 required: false,
@@ -224,15 +224,20 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
             StaticAttributeDef {
                 name: "scope",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "preference",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
                 attr_type: "STRING",
                 required: false,
             },
@@ -245,18 +250,18 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
         indexed_attributes: &["scope"],
     },
     PredefinedCategory {
-        name: "bugs",
-        description: "Bug patterns, root causes, fixes, workarounds",
+        name: "issues",
+        description: "Problems and their resolutions — symptoms, causes, fixes",
         attributes: &[
             StaticAttributeDef {
                 name: "area",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "symptom",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "cause",
@@ -284,6 +289,11 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
                 required: false,
             },
             StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
                 name: "created_at",
                 attr_type: "STRING",
                 required: false,
@@ -293,17 +303,17 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
     },
     PredefinedCategory {
         name: "tools",
-        description: "Endpoints, configs, infrastructure, CI/CD, environments",
+        description: "Tools, services, resources, infrastructure",
         attributes: &[
             StaticAttributeDef {
                 name: "kind",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "name",
                 attr_type: "STRING",
-                required: true,
+                required: false,
             },
             StaticAttributeDef {
                 name: "value",
@@ -321,6 +331,11 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
                 required: false,
             },
             StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
                 name: "created_at",
                 attr_type: "STRING",
                 required: false,
@@ -329,8 +344,55 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
         indexed_attributes: &["kind", "name"],
     },
     PredefinedCategory {
+        name: "events",
+        description: "Appointments, deadlines, scheduled events",
+        attributes: &[
+            StaticAttributeDef {
+                name: "title",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "date",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "time",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "location",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "notes",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["date", "title"],
+    },
+    PredefinedCategory {
         name: "notes",
-        description: "General-purpose catch-all for anything that doesn't fit elsewhere",
+        description: "General-purpose catch-all",
         attributes: &[
             StaticAttributeDef {
                 name: "topic",
@@ -339,6 +401,43 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
             },
             StaticAttributeDef {
                 name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["topic"],
+    },
+    PredefinedCategory {
+        name: "scratchpad",
+        description: "Ephemeral working memory — observations and quick captures (24h default TTL)",
+        attributes: &[
+            StaticAttributeDef {
+                name: "topic",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "source",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
                 attr_type: "STRING",
                 required: false,
             },
@@ -516,7 +615,7 @@ Rules:
 - For NUMBER attributes: use numeric values
 - For BOOLEAN attributes: use true/false
 - Keep values concise but complete
-- Do NOT include "created_at" — that is handled automatically
+- Do NOT include "created_at" or "expires_at" — those are handled automatically
 - IMPORTANT: Resolve all relative dates and times to absolute values using the provided current date. "tomorrow" → actual date, "next week" → actual date, "in 3 days" → actual date. Use ISO 8601 format (YYYY-MM-DD) for dates and 24h format (HH:MM) for times."#;
 
 const PARSE_WITH_CATEGORY_PROMPT: &str = r#"You are a document parser for a structured memory system. Given a set of available categories and natural language input, pick the best category and extract a structured JSON document.
@@ -539,7 +638,7 @@ Rules:
 - For NUMBER attributes: use numeric values
 - For BOOLEAN attributes: use true/false
 - Keep values concise but complete
-- Do NOT include "created_at" — that is handled automatically
+- Do NOT include "created_at" or "expires_at" — those are handled automatically
 - If the input doesn't fit any category well, use "notes" as the fallback
 - IMPORTANT: Resolve all relative dates and times to absolute values using the provided current date. "tomorrow" → actual date, "next week" → actual date, "in 3 days" → actual date. Use ISO 8601 format (YYYY-MM-DD) for dates and 24h format (HH:MM) for times."#;
 
@@ -553,7 +652,7 @@ pub async fn parse_to_document(
     let attrs_desc: Vec<String> = schema
         .attributes
         .iter()
-        .filter(|a| a.name != "created_at")
+        .filter(|a| a.name != "created_at" && a.name != "expires_at")
         .map(|a| {
             format!(
                 "  - {} ({}{})",
@@ -595,7 +694,7 @@ pub async fn parse_to_document_with_category(
         let attrs: Vec<String> = schema
             .attributes
             .iter()
-            .filter(|a| a.name != "created_at")
+            .filter(|a| a.name != "created_at" && a.name != "expires_at")
             .map(|a| {
                 format!(
                     "    - {} ({}{})",
@@ -922,7 +1021,7 @@ mod tests {
 
     #[test]
     fn test_predefined_schemas_count() {
-        assert_eq!(PREDEFINED_SCHEMAS.len(), 7);
+        assert_eq!(PREDEFINED_SCHEMAS.len(), 9);
     }
 
     #[test]
@@ -977,6 +1076,73 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_predefined_schemas_have_expires_at() {
+        for schema in PREDEFINED_SCHEMAS {
+            assert!(
+                schema
+                    .attributes
+                    .iter()
+                    .any(|a| a.name == "expires_at" && a.attr_type == "STRING" && !a.required),
+                "Category '{}' missing expires_at attribute",
+                schema.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_required_attributes() {
+        for schema in PREDEFINED_SCHEMAS {
+            for attr in schema.attributes {
+                assert!(
+                    !attr.required,
+                    "Category '{}' attribute '{}' should not be required",
+                    schema.name, attr.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_scratchpad_has_source_attribute() {
+        let scratchpad = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "scratchpad")
+            .expect("scratchpad category must exist");
+        assert!(
+            scratchpad.attributes.iter().any(|a| a.name == "source"),
+            "scratchpad must have a 'source' attribute"
+        );
+    }
+
+    #[test]
+    fn test_events_has_date_attribute() {
+        let events = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "events")
+            .expect("events category must exist");
+        assert!(
+            events.attributes.iter().any(|a| a.name == "date"),
+            "events must have a 'date' attribute"
+        );
+        assert!(
+            events.attributes.iter().any(|a| a.name == "time"),
+            "events must have a 'time' attribute"
+        );
+    }
+
+    #[test]
+    fn test_issues_replaces_bugs() {
+        assert!(
+            PREDEFINED_SCHEMAS.iter().any(|s| s.name == "issues"),
+            "issues category must exist"
+        );
+        assert!(
+            !PREDEFINED_SCHEMAS.iter().any(|s| s.name == "bugs"),
+            "bugs category should not exist (renamed to issues)"
+        );
     }
 
     // --- parse_to_document ---

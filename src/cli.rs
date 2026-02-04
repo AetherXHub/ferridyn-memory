@@ -10,6 +10,10 @@ use ferridyn_memory::schema::{
     NlIntent, PREDEFINED_SCHEMAS, ResolvedQuery, SchemaDefinition, SchemaManager, answer_query,
     classify_intent, parse_to_document, parse_to_document_with_category, resolve_query,
 };
+use ferridyn_memory::ttl::{
+    SCRATCHPAD_DEFAULT_TTL, auto_ttl_from_date, compute_expires_at, filter_expired, is_expired,
+    parse_ttl,
+};
 use ferridyn_memory::{PartitionSchemaInfo, ensure_memories_table_via_server, resolve_socket_path};
 
 #[derive(Parser)]
@@ -25,6 +29,10 @@ struct Cli {
     /// Natural language prompt (remember or recall via intent classification)
     #[arg(short, long)]
     prompt: Option<String>,
+
+    /// Include expired items in results (debug)
+    #[arg(long, global = true)]
+    include_expired: bool,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -56,6 +64,8 @@ enum Command {
         category: Option<String>,
         #[arg(long)]
         key: Option<String>,
+        #[arg(long, help = "Time-to-live: 24h, 7d, 30d")]
+        ttl: Option<String>,
         /// Natural language input (positional, collects remaining args)
         input: Vec<String>,
     },
@@ -89,6 +99,20 @@ enum Command {
     Init {
         #[arg(long, help = "Recreate schemas even if they already exist")]
         force: bool,
+    },
+    /// Promote a memory: remove TTL (STM to LTM), optionally re-categorize
+    Promote {
+        #[arg(long, help = "Source category")]
+        category: String,
+        #[arg(long, help = "Item key")]
+        key: String,
+        #[arg(long, help = "Target category (re-categorize during promotion)")]
+        to: Option<String>,
+    },
+    /// Delete all expired memories
+    Prune {
+        #[arg(long, help = "Only prune this category")]
+        category: Option<String>,
     },
 }
 
@@ -158,6 +182,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .query(cat, None, limit)
                     .await
                     .map_err(|e| e.to_string())?;
+                let items = if cli.include_expired {
+                    items
+                } else {
+                    filter_expired(items)
+                };
                 let schema = schema_manager.get_schema(cat).await.ok().flatten();
                 let indexes = schema_manager.list_indexes().await.unwrap_or_default();
                 let cat_indexes: Vec<_> = indexes
@@ -276,6 +305,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ref k) = key {
                     // Exact item by category + key.
                     let item = backend.get_item(cat, k).await.map_err(|e| e.to_string())?;
+                    // Filter expired items unless --include-expired.
+                    let item = item.filter(|i| cli.include_expired || !is_expired(i));
                     if let Some(item) = item {
                         if cli.json {
                             println!("{}", serde_json::to_string_pretty(&item)?);
@@ -291,6 +322,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .query(cat, None, limit)
                         .await
                         .map_err(|e| e.to_string())?;
+                    let items = if cli.include_expired {
+                        items
+                    } else {
+                        filter_expired(items)
+                    };
                     if cli.json {
                         println!("{}", serde_json::to_string_pretty(&items)?);
                     } else if items.is_empty() {
@@ -320,6 +356,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map_err(|e| format!("Query resolution failed: {e}"))?;
 
                 let (items, _) = execute_with_fallback(&backend, &resolved, limit).await?;
+                let items = if cli.include_expired {
+                    items
+                } else {
+                    filter_expired(items)
+                };
 
                 if cli.json {
                     println!("{}", serde_json::to_string_pretty(&items)?);
@@ -343,6 +384,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Remember {
             category,
             key,
+            ttl,
             input,
         }) => {
             let input_text = input.join(" ");
@@ -409,6 +451,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Auto-inject created_at timestamp.
             final_item["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
 
+            // Auto-inject expires_at based on --ttl flag or category defaults.
+            if let Some(ref ttl_str) = ttl {
+                let duration = parse_ttl(ttl_str).map_err(|e| e.to_string())?;
+                final_item["expires_at"] = Value::String(compute_expires_at(duration));
+            } else if category == "scratchpad" {
+                final_item["expires_at"] =
+                    Value::String(compute_expires_at(SCRATCHPAD_DEFAULT_TTL));
+            } else if category == "events"
+                && let Some(expires) = auto_ttl_from_date(&final_item)
+            {
+                final_item["expires_at"] = Value::String(expires);
+            }
+
             backend
                 .put_item(final_item.clone())
                 .await
@@ -420,7 +475,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|obj| {
                     obj.iter()
                         .filter(|(k, v)| {
-                            *k != "category" && *k != "key" && *k != "created_at" && !v.is_null()
+                            *k != "category"
+                                && *k != "key"
+                                && *k != "created_at"
+                                && *k != "expires_at"
+                                && !v.is_null()
                         })
                         .map(|(k, _)| k.as_str())
                         .collect()
@@ -609,6 +668,167 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        Some(Command::Promote { category, key, to }) => {
+            let item = backend
+                .get_item(&category, &key)
+                .await
+                .map_err(|e| e.to_string())?;
+            let item = match item {
+                Some(i) => i,
+                None => {
+                    eprintln!("No memory found for {category}/{key}");
+                    std::process::exit(1);
+                }
+            };
+
+            let target_category = to.as_deref().unwrap_or(&category);
+
+            if target_category != category {
+                // Re-categorize: re-parse content against target schema.
+                let llm = require_llm()?;
+                auto_init(&backend, &schema_manager).await?;
+
+                let schema_info = schema_manager
+                    .get_schema(target_category)
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .ok_or_else(|| format!("Schema for '{}' not found", target_category))?;
+
+                // Use item's content (or all string attributes) as input for re-parsing.
+                let input_text = item["content"]
+                    .as_str()
+                    .unwrap_or_else(|| {
+                        item.as_object()
+                            .and_then(|obj| {
+                                obj.iter()
+                                    .filter(|(k, v)| {
+                                        *k != "category"
+                                            && *k != "key"
+                                            && *k != "created_at"
+                                            && *k != "expires_at"
+                                            && v.is_string()
+                                    })
+                                    .map(|(_, v)| v.as_str().unwrap_or(""))
+                                    .next()
+                            })
+                            .unwrap_or("")
+                    })
+                    .to_string();
+
+                let doc =
+                    parse_to_document(llm.as_ref(), target_category, &schema_info, &input_text)
+                        .await
+                        .map_err(|e| format!("Document parsing failed: {e}"))?;
+                let new_key = doc["key"].as_str().unwrap_or(&key).to_string();
+
+                // Build promoted item without expires_at.
+                let mut promoted = serde_json::json!({
+                    "category": target_category,
+                    "key": new_key,
+                });
+                if let Some(obj) = doc.as_object() {
+                    for (k, v) in obj {
+                        if k == "key" || k == "category" {
+                            continue;
+                        }
+                        promoted[k] = v.clone();
+                    }
+                }
+                promoted["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
+                // Explicitly remove expires_at (promotion = LTM).
+                if let Some(obj) = promoted.as_object_mut() {
+                    obj.remove("expires_at");
+                }
+
+                backend
+                    .put_item(promoted.clone())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                backend
+                    .delete_item(&category, &key)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                if cli.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "promoted": true,
+                            "from": format!("{category}/{key}"),
+                            "to": format!("{target_category}/{new_key}"),
+                        }))?
+                    );
+                } else {
+                    eprintln!("Promoted {category}/{key} → {target_category}/{new_key}");
+                }
+            } else {
+                // Same category: just remove expires_at (in-place promotion).
+                let mut promoted = item.clone();
+                if let Some(obj) = promoted.as_object_mut() {
+                    obj.remove("expires_at");
+                }
+                // Re-inject created_at to update timestamp.
+                promoted["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
+
+                backend
+                    .put_item(promoted)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                if cli.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "promoted": true,
+                            "category": category,
+                            "key": key,
+                        }))?
+                    );
+                } else {
+                    eprintln!("Promoted {category}/{key} (TTL removed)");
+                }
+            }
+        }
+        Some(Command::Prune { category }) => {
+            let categories: Vec<String> = if let Some(ref cat) = category {
+                vec![cat.clone()]
+            } else {
+                let schemas = schema_manager.list_schemas().await.unwrap_or_default();
+                schemas.iter().map(|s| s.prefix.clone()).collect()
+            };
+
+            let mut total_pruned = 0usize;
+            for cat in &categories {
+                let items = backend
+                    .query(cat, None, 1000)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                for item in &items {
+                    if is_expired(item)
+                        && let Some(key) = item["key"].as_str()
+                    {
+                        backend
+                            .delete_item(cat, key)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        total_pruned += 1;
+                    }
+                }
+            }
+
+            if cli.json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "pruned": total_pruned,
+                    }))?
+                );
+            } else if total_pruned == 0 {
+                eprintln!("No expired memories found.");
+            } else {
+                eprintln!("Pruned {total_pruned} expired memories.");
+            }
+        }
         None => {
             let input = match cli.prompt {
                 Some(ref p) => p.clone(),
@@ -659,6 +879,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     final_item["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
 
+                    // Auto-inject expires_at for scratchpad or events.
+                    if category == "scratchpad" {
+                        final_item["expires_at"] =
+                            Value::String(compute_expires_at(SCRATCHPAD_DEFAULT_TTL));
+                    } else if category == "events"
+                        && let Some(expires) = auto_ttl_from_date(&final_item)
+                    {
+                        final_item["expires_at"] = Value::String(expires);
+                    }
+
                     backend
                         .put_item(final_item.clone())
                         .await
@@ -676,6 +906,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         *k != "category"
                                             && *k != "key"
                                             && *k != "created_at"
+                                            && *k != "expires_at"
                                             && !v.is_null()
                                     })
                                     .map(|(k, _)| k.as_str())
@@ -709,6 +940,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .map_err(|e| format!("Query resolution failed: {e}"))?;
 
                     let (items, _) = execute_with_fallback(&backend, &resolved, 20).await?;
+                    let items = if cli.include_expired {
+                        items
+                    } else {
+                        filter_expired(items)
+                    };
 
                     if cli.json {
                         println!("{}", serde_json::to_string_pretty(&items)?);

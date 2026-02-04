@@ -25,17 +25,19 @@ Set `ANTHROPIC_API_KEY` for natural language features (see [when it's required](
 
 ## Predefined Categories
 
-fmemory ships with 7 built-in categories that are created automatically on first use. Every item gets a `created_at` timestamp (ISO 8601, UTC) injected automatically.
+fmemory ships with 9 built-in categories that are created automatically on first use. Every item gets a `created_at` timestamp (ISO 8601, UTC) injected automatically. Items may also have an `expires_at` timestamp for time-limited (STM) storage.
 
 | Category | Description | Indexed Attributes |
 |----------|-------------|--------------------|
-| `project` | Codebase knowledge — architecture, conventions, gotchas, structure | area, topic |
-| `decisions` | Architectural and design decisions with rationale | domain |
+| `project` | Domain knowledge — structure, patterns, key facts | area, topic |
+| `decisions` | Decisions with rationale — what was chosen and why | domain |
 | `contacts` | People — names, roles, contact info | name, email, role, team |
 | `preferences` | User preferences, workflow patterns, directives | scope |
-| `bugs` | Bug patterns, root causes, fixes, workarounds | area |
-| `tools` | Endpoints, configs, infrastructure, CI/CD, environments | kind, name |
-| `notes` | General-purpose catch-all for anything that doesn't fit elsewhere | topic |
+| `issues` | Problems and their resolutions — symptoms, causes, fixes | area |
+| `tools` | Tools, services, resources, infrastructure | kind, name |
+| `events` | Appointments, deadlines, scheduled events | date, title |
+| `notes` | General-purpose catch-all | topic |
+| `scratchpad` | Ephemeral working memory — observations and quick captures (24h default TTL) | topic |
 
 Custom categories can be added with `fmemory define`.
 
@@ -52,6 +54,12 @@ fmemory remember --category contacts "Toby is a backend engineer"
 
 # Full control
 fmemory remember --category contacts --key toby "backend engineer at Example Corp"
+
+# With explicit TTL (short-term memory)
+fmemory remember --ttl 24h "staging server is at staging.example.com"
+
+# Scratchpad items auto-get 24h TTL
+fmemory remember --category scratchpad "hypothesis: the timeout is caused by DNS resolution"
 ```
 
 When `--category` is omitted, Haiku selects the best matching category from the predefined list and parses the input into structured attributes in a single LLM call. When a category is specified, the input is parsed against the existing schema.
@@ -69,6 +77,26 @@ fmemory init --force
 ```
 
 Initialization happens automatically on first `remember` if no schemas exist. The `init` command is useful for explicit setup or resetting schemas.
+
+### Promote a memory (STM → LTM)
+
+```bash
+# Remove TTL, keep in same category
+fmemory promote --category scratchpad --key hypothesis
+
+# Promote and re-categorize (LLM re-parses into target schema)
+fmemory promote --category scratchpad --key hypothesis --to issues
+```
+
+### Delete expired memories
+
+```bash
+# Prune all expired items across all categories
+fmemory prune
+
+# Prune only a specific category
+fmemory prune --category scratchpad
+```
 
 ### Retrieve memories
 
@@ -117,7 +145,7 @@ fmemory define \
   --auto-index
 ```
 
-Attribute types: `STRING`, `NUMBER`, `BOOLEAN`. The `--auto-index` flag creates a secondary index for each attribute. Use `define` for categories beyond the 7 predefined ones.
+Attribute types: `STRING`, `NUMBER`, `BOOLEAN`. The `--auto-index` flag creates a secondary index for each attribute. Use `define` for categories beyond the 9 predefined ones.
 
 ### View schema
 
@@ -136,6 +164,7 @@ fmemory schema
 | Flag | Description |
 |------|-------------|
 | `--json` | Machine-readable JSON output to stdout (default: human-readable prose) |
+| `--include-expired` | Include expired items in results (debugging) |
 | `-p, --prompt <text>` | Natural language prompt — classifies intent and routes to remember or recall. Requires `ANTHROPIC_API_KEY`. |
 
 ### Subcommands
@@ -146,7 +175,7 @@ Create all predefined category schemas and their indexes. Idempotent — skips c
 
 Does not require `ANTHROPIC_API_KEY`.
 
-#### `remember [--category CAT] [--key KEY] <input...>`
+#### `remember [--category CAT] [--key KEY] [--ttl DURATION] <input...>`
 
 Store a memory. Input is positional (remaining args joined by space).
 
@@ -154,6 +183,7 @@ Store a memory. Input is positional (remaining args joined by space).
 |------|------|----------|-------------|
 | `--category` | String | No | Target category. Must be a predefined or user-defined category. If omitted, Haiku selects from available categories. |
 | `--key` | String | No | Item key. If omitted, Haiku extracts one from the parsed document. |
+| `--ttl` | String | No | Time-to-live: `1h`, `24h`, `7d`, `30d`, `2w`. Scratchpad auto-gets `24h`. Events auto-compute from `date`. |
 
 A `created_at` timestamp (ISO 8601, UTC) is automatically injected into every stored item.
 
@@ -204,6 +234,24 @@ Does not require `ANTHROPIC_API_KEY`.
 
 View schema and index info. Without `--category`, lists all schemas. Does not require `ANTHROPIC_API_KEY`.
 
+#### `promote --category CAT --key KEY [--to TARGET]`
+
+Promote an item from STM to LTM by removing its `expires_at`. With `--to`, re-categorize via LLM re-parsing.
+
+| Flag | Type | Required | Description |
+|------|------|----------|-------------|
+| `--category` | String | Yes | Source category |
+| `--key` | String | Yes | Item key |
+| `--to` | String | No | Target category for re-categorization. Requires `ANTHROPIC_API_KEY`. |
+
+#### `prune [--category CAT]`
+
+Delete all expired memories. Without `--category`, scans all categories. Does not require `ANTHROPIC_API_KEY`.
+
+| Flag | Type | Required | Description |
+|------|------|----------|-------------|
+| `--category` | String | No | Limit pruning to this category |
+
 ### Output conventions
 
 - **Data** (items, schemas, JSON) goes to **stdout**
@@ -223,7 +271,7 @@ The CLI connects to `ferridyn-server` via Unix socket. The `memories` table uses
 
 ### How schemas work
 
-fmemory ships with 7 predefined category schemas codified at compile time. On first use (or via `fmemory init`), these schemas and their secondary indexes are created in the database.
+fmemory ships with 9 predefined category schemas codified at compile time. On first use (or via `fmemory init`), these schemas and their secondary indexes are created in the database.
 
 When storing a memory:
 1. If no schemas exist yet, auto-initialization creates all predefined categories
@@ -241,6 +289,19 @@ Natural language queries go through a multi-step resolution:
 3. If no results, falls back to scanning the full category
 4. In prose mode, Haiku synthesizes a natural language answer from retrieved items
 
+### How TTL works
+
+Items can have an `expires_at` attribute (RFC 3339 timestamp). On every read, the CLI filters out expired items client-side. FerridynDB has no native TTL — this is purely application-level.
+
+**Short-Term Memory (STM)** — Items with `expires_at`. They will expire and can be pruned.
+**Long-Term Memory (LTM)** — Items without `expires_at`. They persist indefinitely.
+
+| Category | Default TTL | Behavior |
+|----------|-------------|----------|
+| `scratchpad` | 24 hours | Auto-set on every store |
+| `events` | End of event date | Auto-computed from `date` attribute |
+| All others | None (LTM) | Set manually with `--ttl` flag |
+
 ## Environment Variables
 
 | Variable | Required | Purpose |
@@ -256,7 +317,7 @@ For Claude Code integration (auto-retrieval hooks, skills, agent behaviors), see
 
 ```bash
 cargo build                       # compile
-cargo test                        # 32 tests
+cargo test                        # 55 tests
 cargo clippy -- -D warnings       # lint
 cargo fmt --check                 # format check
 ```
