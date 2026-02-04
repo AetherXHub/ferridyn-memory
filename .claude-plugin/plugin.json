@@ -1,5 +1,0 @@
-{
-  "name": "ferridyn-memory",
-  "version": "0.1.0",
-  "description": "Agentic memory system backed by FerridynDB. Automatically recalls relevant context and persists learnings across sessions."
-}

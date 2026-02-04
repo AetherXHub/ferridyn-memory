@@ -1,5 +1,3 @@
 target
 .omc
 .mcp.json
-node_modules
-scripts/dist
