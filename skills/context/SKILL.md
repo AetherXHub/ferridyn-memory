@@ -35,27 +35,28 @@ Before starting work, ask yourself:
 Use natural language recall for broad context:
 
 ```bash
-fmemory recall --query "{description of what you need to know}"
+fmemory recall --query "authentication conventions and decisions"
 ```
 
 Or use the shorthand:
 
 ```bash
-fmemory "{description of what you need to know}"
+fmemory "authentication conventions and decisions"
 ```
 
-Or use precise recall if you know the category:
+Or use exact lookup if you know the category and key:
 
 ```bash
-fmemory recall --category "project" --prefix "conventions"
+fmemory recall --category project --key conventions
+fmemory recall --category decisions
 ```
 
 For multiple areas, make multiple calls:
 
 ```bash
-fmemory recall --category "decisions" --prefix "auth"
-fmemory recall --category "preferences"
-fmemory recall --category "bugs" --prefix "auth"
+fmemory recall --query "auth decisions"
+fmemory recall --category preferences
+fmemory recall --query "auth bugs and gotchas"
 ```
 
 ### Step 3: Browse If Needed
@@ -69,7 +70,7 @@ fmemory discover
 Then drill into relevant categories:
 
 ```bash
-fmemory discover --category "project"
+fmemory discover --category project
 ```
 
 ### Step 4: Handle Missing Knowledge (Critical)
@@ -77,15 +78,14 @@ fmemory discover --category "project"
 **If you expect information to exist but it's missing, ASK the user.**
 
 Examples:
-- About to write database queries but no memory of the ORM or query style → Ask: "What ORM/query approach does this project use?"
-- About to add error handling but no convention stored → Ask: "What's your preferred error handling pattern?"
-- Need to know the deployment target but nothing stored → Ask: "Where does this project deploy?"
+- About to write database queries but no memory of the ORM or query style -> Ask: "What ORM/query approach does this project use?"
+- About to add error handling but no convention stored -> Ask: "What's your preferred error handling pattern?"
+- Need to know the deployment target but nothing stored -> Ask: "Where does this project deploy?"
 
-After the user answers, **store it immediately**:
+After the user answers, **store it immediately** using NL-first syntax:
 
 ```bash
-fmemory remember --category "project" --key "conventions#error-handling" \
-  --content "{user's answer}" --metadata "source: user clarification, {date}"
+fmemory remember --category project "Error handling convention: custom error enums per module with From impls"
 ```
 
 This way, no future session needs to ask the same question.
@@ -100,12 +100,12 @@ Use the retrieved memories to inform your work. Mention relevant context when it
 
 | Situation | What to Query |
 |-----------|--------------|
-| Starting a new feature | `project/conventions`, `decisions/{area}`, `preferences` |
-| Debugging | `bugs/{area}`, `project/architecture` |
-| Refactoring | `project/architecture`, `decisions`, `project/conventions` |
-| Writing tests | `project/conventions#testing`, `preferences` |
-| Configuring tools | `tools`, `project/build` |
-| Working with people | `people/{name}` |
+| Starting a new feature | `--query "conventions for {area}"`, `--category decisions`, `--category preferences` |
+| Debugging | `--query "bugs in {area}"`, `--query "architecture of {area}"` |
+| Refactoring | `--query "architecture"`, `--category decisions`, `--query "conventions"` |
+| Writing tests | `--query "testing conventions"`, `--category preferences` |
+| Configuring tools | `--category tools`, `--query "build configuration"` |
+| Working with people | `--query "{name}"` or `--category contacts --key {name}` |
 
 ## Depth Calibration
 

@@ -1,6 +1,6 @@
 ---
 name: status
-description: Quick overview of what's in memory — categories, entry counts, and sample keys. Orient yourself at session start or check what's been stored.
+description: Quick overview of what's in memory — categories, schemas, indexes, entry counts, and sample keys. Orient yourself at session start or check what's been stored.
 ---
 
 # Status — Memory Overview
@@ -27,7 +27,7 @@ For structured data, run the stats utility:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/dist/memory-stats.mjs
 ```
 
-This outputs JSON with `total_categories`, `total_entries`, and per-category details (name, description, key_format, entry_count, prefixes, sample_keys).
+This outputs JSON with `total_categories`, `total_entries`, and per-category details (name, description, attributes, indexes, entry_count, sample_keys).
 
 ### Step 1 (Alternative): Manual CLI Discovery
 
@@ -45,29 +45,29 @@ fmemory discover --category "{cat}"
 
 ### Step 2: Present Summary
 
-Format as a readable overview:
+Format as a readable overview showing schemas and indexes:
 
 ```
 Memory Status: 4 categories, ~47 entries
 
-  people (8 entries)
-    Schema: People and contacts ({name}#{attribute})
+  contacts (8 entries)
+    Schema: People and contacts (3 attributes, 2 indexes)
     Keys: alice, bob, carol, toby
 
   project (22 entries)
-    Schema: Project structure and conventions ({area}#{topic})
+    Schema: Project structure and conventions (4 attributes, 1 index)
     Keys: architecture, build, conventions, dependencies, patterns, structure
 
   decisions (12 entries)
-    Schema: Architecture and design decisions ({area}#{decision})
+    Schema: Architecture and design decisions (4 attributes, 1 index)
     Keys: api, auth, database, frontend, testing
 
   preferences (5 entries)
-    Schema: User workflow preferences ({domain}#{preference})
+    Schema: User workflow preferences (2 attributes, 0 indexes)
     Keys: code, editor, workflow
 ```
 
-### Step 4: Offer Next Steps
+### Step 3: Offer Next Steps
 
 Based on what's in memory, suggest:
 
@@ -83,8 +83,8 @@ Sometimes you just need to know if a specific topic is stored, not a full overvi
 fmemory "database configuration"
 ```
 
-If results come back → topic is covered.
-If nothing → consider asking the user and storing the answer (context skill behavior).
+If results come back -> topic is covered.
+If nothing -> consider asking the user and storing the answer (context skill behavior).
 
 ## When NOT to Run Full Status
 

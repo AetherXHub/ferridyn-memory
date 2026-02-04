@@ -33,7 +33,7 @@ Ask yourself: **"What would I want to know if I started a fresh session on this 
 | Gotchas | "The test suite requires REDIS_URL even for unit tests" | `project` |
 | Conventions | "All API routes use kebab-case, handlers use camelCase" | `project` |
 | Preferences | "User prefers explicit error types over anyhow" | `preferences` |
-| Architecture | "Events flow: API → queue → processor → DB → webhook" | `project` |
+| Architecture | "Events flow: API -> queue -> processor -> DB -> webhook" | `project` |
 | Workarounds | "Must pin openssl-sys to 0.9.80 on ARM builds" | `bugs` |
 
 ### Low-Value (Skip These)
@@ -64,12 +64,18 @@ See what categories exist. Avoid storing duplicates of things already known.
 
 ### Step 3: Store Each Learning
 
-For each learning worth persisting:
+For each learning worth persisting, use NL-first syntax:
 
 ```bash
-fmemory remember --category "{appropriate category}" --key "{area}#{topic}" \
-  --content "{concise, self-contained description including the WHY}" \
-  --metadata "source: reflection, {date}"
+fmemory remember --category decisions "Chose 15-minute refresh tokens for security/UX balance. Alternatives: session cookies (rejected, serverless), long-lived tokens (rejected, security)"
+```
+
+```bash
+fmemory remember --category bugs "Integration tests fail intermittently when DB pool exhausts under concurrent test runners"
+```
+
+```bash
+fmemory remember --category project "Convention: custom error enums per module, not anyhow"
 ```
 
 ### Step 4: Summarize
@@ -78,9 +84,9 @@ Tell the user what was stored:
 
 ```
 Reflected on this session and stored 3 memories:
-  - decisions: `auth#token-rotation` — Chose 15-minute refresh tokens for security/UX balance
-  - bugs: `ci#flaky-test-db-pool` — Integration tests fail intermittently when DB pool exhausts
-  - project: `conventions#error-types` — Custom error enums per module, not anyhow
+  - decisions: token-rotation — Chose 15-minute refresh tokens for security/UX balance
+  - bugs: flaky-test-db-pool — Integration tests fail intermittently when DB pool exhausts
+  - project: error-types — Custom error enums per module, not anyhow
 ```
 
 ## Depth Calibration
@@ -96,6 +102,6 @@ Match reflection depth to work complexity:
 
 ## Integration with Other Skills
 
-- If reflection surfaces a decision → also consider `/ferridyn-memory:decide` for richer logging
-- If reflection finds outdated memories → use `/ferridyn-memory:update` to correct them
-- If you're unsure about something discovered → ask the user before storing
+- If reflection surfaces a decision -> also consider `/ferridyn-memory:decide` for richer logging
+- If reflection finds outdated memories -> use `/ferridyn-memory:update` to correct them
+- If you're unsure about something discovered -> ask the user before storing

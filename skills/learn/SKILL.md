@@ -7,12 +7,11 @@ description: Deep codebase exploration that builds persistent project memory. Li
 
 Explore the codebase deeply and store structured findings as persistent memories. This is the FerridynDB equivalent of `/init` — but instead of writing a one-time CLAUDE.md, it builds incrementally updatable project knowledge.
 
-## Schema
+## Category
 
 Category: `project`
-Key format: `{area}#{topic}`
 
-Areas:
+Areas (used as keys or key prefixes):
 - `structure` — directory layout, crate/module organization, entry points
 - `conventions` — naming patterns, code style, error handling
 - `architecture` — design patterns, data flow, key abstractions
@@ -27,7 +26,7 @@ Areas:
 Before exploring, check if project memories already exist:
 
 ```bash
-fmemory recall --category "project" --limit 5
+fmemory recall --category project --limit 5
 ```
 
 If memories exist, ask the user:
@@ -41,53 +40,47 @@ If memories exist, ask the user:
 
 If "Start fresh": recall all project memories and forget each one.
 
-### Step 1: Define Schema
+### Step 1: Define Schema (if new)
 
-Ensure the project schema is defined:
+If the `project` category doesn't exist yet, define its schema:
 
 ```bash
-fmemory define --category "project" \
-  --description "Project structure, conventions, architecture, and build knowledge" \
-  --sort_key_format "{area}#{topic}" \
-  --segments '{"area": "knowledge area (structure, conventions, architecture, dependencies, build, patterns)", "topic": "specific topic within the area"}' \
-  --examples "structure#crate-layout, conventions#naming, architecture#data-flow, dependencies#serde, build#test-commands"
+fmemory define --category project --description "Project structure, conventions, architecture, and build knowledge" \
+  --attributes '[{"name":"area","type":"STRING","required":true},{"name":"topic","type":"STRING","required":true},{"name":"details","type":"STRING","required":true}]' \
+  --auto-index
 ```
 
 ### Step 2: Explore and Store
 
-For each area, explore the codebase and store findings:
+For each area, explore the codebase and store findings using NL-first syntax:
 
 #### structure
-- Scan directory layout with `ls` / `find`
+- Scan directory layout
 - Identify languages, frameworks, entry points
-- Store: `structure#directory-layout`, `structure#entry-points`, `structure#module-organization`
+- Store: `fmemory remember --category project "Project structure: src/ contains Rust source, scripts/ has TypeScript hooks..."`
 
 #### conventions
 - Read a sample of source files
-- Identify naming patterns (camelCase, snake_case, etc.)
-- Error handling style (Result types, error crates, panic policy)
-- Test conventions (location, naming, fixtures)
-- Store: `conventions#naming`, `conventions#error-handling`, `conventions#testing`
+- Identify naming patterns, error handling style, test conventions
+- Store: `fmemory remember --category project "Naming convention: snake_case for Rust modules, camelCase for TypeScript..."`
 
 #### architecture
 - Read entry points and public APIs
 - Identify key abstractions and their relationships
-- Trace data flow through the system
-- Store: `architecture#key-abstractions`, `architecture#data-flow`, `architecture#design-decisions`
+- Store: `fmemory remember --category project "Architecture: MCP server delegates to SchemaManager for inference..."`
 
 #### dependencies
 - Read Cargo.toml / package.json / requirements.txt
 - Catalog major dependencies and their purposes
-- Store: `dependencies#{dep-name}` for each major dependency
+- Store: `fmemory remember --category project "Key dependency: rmcp 0.14 for MCP server framework..."`
 
 #### build
 - Identify build commands, test commands, CI config
-- Store: `build#commands`, `build#ci`, `build#test-infrastructure`
+- Store: `fmemory remember --category project "Build: cargo build --release for binaries, npm run build:scripts for hooks..."`
 
 #### patterns
 - Identify recurring code patterns
-- Common idioms specific to the project
-- Store: `patterns#error-propagation`, `patterns#testing-helpers`, etc.
+- Store: `fmemory remember --category project "Pattern: all LLM calls go through LlmClient trait for testability..."`
 
 ### Step 3: Present Summary
 
@@ -123,4 +116,4 @@ The learn skill can be re-run to update specific areas. When updating:
 1. Recall existing entries for that area
 2. Compare with current codebase state
 3. Forget outdated entries
-4. Remember updated entries
+4. Remember updated entries using NL-first syntax

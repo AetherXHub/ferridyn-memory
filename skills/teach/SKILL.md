@@ -26,8 +26,7 @@ You do NOT need to wait for `/ferridyn-memory:teach` — act on these patterns i
 Extract from the user's statement:
 - **What** — the fact, preference, decision, or convention
 - **Category** — which domain it belongs to (see conventions below)
-- **Key** — a hierarchical `segment#segment` key
-- **Content** — concise, self-contained text
+- **Content** — descriptive natural language text
 
 ### Step 2: Check Existing Categories
 
@@ -39,30 +38,31 @@ See what categories already exist. Prefer reusing existing categories over creat
 
 ### Step 3: Store the Memory
 
+Use NL-first syntax — let fmemory extract structure from your description:
+
 ```bash
-fmemory remember --category "{inferred category}" --key "{inferred key}" \
-  --content "{extracted content}" --metadata "source: user taught, {date}"
+fmemory remember --category contacts "Toby is a backend engineer, email toby@example.com"
 ```
 
-If the category is new, fmemory will auto-infer a schema from your first write.
+If the category is new, fmemory will auto-infer a schema with typed attributes and indexes from your first write.
 
 ### Step 4: Confirm
 
 Tell the user what you stored and how you categorized it. Keep it brief:
 
-> Stored in **people**: `toby#email` = "toby@example.com"
+> Stored in **contacts**: Toby — backend engineer, toby@example.com
 
 ## Category Inference Guide
 
-| User Says... | Category | Key | Content |
-|--------------|----------|-----|---------|
-| "Toby's email is toby@example.com" | `people` | `toby#email` | toby@example.com |
-| "We use tabs not spaces" | `preferences` | `code#indentation` | Tabs, not spaces |
-| "The staging URL is staging.example.com" | `tools` | `staging#url` | staging.example.com |
-| "Always run tests before committing" | `preferences` | `workflow#pre-commit` | Always run tests before committing |
-| "We chose Postgres over SQLite for concurrency" | `decisions` | `database#postgres-over-sqlite` | Chose Postgres over SQLite for better concurrency support |
-| "The auth token goes in X-Api-Key header" | `project` | `conventions#auth-header` | Auth token uses X-Api-Key header |
-| "From now on, use async/await not callbacks" | `preferences` | `code#async-style` | Use async/await, not callbacks |
+| User Says... | Category | Store Command |
+|--------------|----------|---------------|
+| "Toby's email is toby@example.com" | `contacts` | `fmemory remember --category contacts "Toby's email is toby@example.com"` |
+| "We use tabs not spaces" | `preferences` | `fmemory remember --category preferences "Code indentation: tabs, not spaces"` |
+| "The staging URL is staging.example.com" | `tools` | `fmemory remember --category tools "Staging URL is staging.example.com"` |
+| "Always run tests before committing" | `preferences` | `fmemory remember --category preferences "Always run tests before committing"` |
+| "We chose Postgres over SQLite for concurrency" | `decisions` | `fmemory remember --category decisions "Chose Postgres over SQLite for better concurrency support"` |
+| "The auth token goes in X-Api-Key header" | `project` | `fmemory remember --category project "Auth token uses X-Api-Key header"` |
+| "From now on, use async/await not callbacks" | `preferences` | `fmemory remember --category preferences "Use async/await, not callbacks"` |
 
 ## When NOT to Store
 
@@ -76,9 +76,9 @@ Tell the user what you stored and how you categorized it. Keep it brief:
 
 If the user says "actually, it's X not Y" and there's an existing memory with the wrong value:
 
-1. Use `fmemory recall` to find the old entry
+1. Use `fmemory recall --query "..."` to find the old entry
 2. Use `fmemory forget` to remove it
-3. Use `fmemory remember` to store the corrected value
-4. Confirm: "Updated **people**: `toby#email` from old@example.com to new@example.com"
+3. Use `fmemory remember` to store the corrected value with NL-first syntax
+4. Confirm: "Updated **contacts**: Toby's email changed from old@example.com to new@example.com"
 
 This is equivalent to the `/ferridyn-memory:update` skill but triggered conversationally.

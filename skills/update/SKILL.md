@@ -27,13 +27,13 @@ You do NOT need to wait for `/ferridyn-memory:update` — correct stale memories
 Use recall to locate the outdated entry:
 
 ```bash
-fmemory recall --query "{description of what needs updating}"
+fmemory recall --query "naming conventions"
 ```
 
 Or if you know the exact location:
 
 ```bash
-fmemory recall --category "project" --prefix "conventions#naming"
+fmemory recall --category project --key conventions
 ```
 
 ### Step 2: Show What Will Change
@@ -43,23 +43,21 @@ Always show the user:
 ```
 Updating memory:
   Category: project
-  Key: conventions#naming
-  Old: "All modules use snake_case file names"
-  New: "All modules use kebab-case file names (changed in 2025 refactor)"
+  Key: conventions
+  Old: naming convention is snake_case for all modules
+  New: naming convention is kebab-case for all modules (changed in 2025 refactor)
 ```
 
 ### Step 3: Replace
 
 ```bash
-fmemory forget --category "project" --key "conventions#naming"
-fmemory remember --category "project" --key "conventions#naming" \
-  --content "All modules use kebab-case file names (changed in 2025 refactor)" \
-  --metadata "updated: {date}, previous: snake_case convention"
+fmemory forget --category project --key conventions
+fmemory remember --category project "Naming convention: kebab-case for all modules (changed in 2025 refactor)"
 ```
 
 ### Step 4: Confirm
 
-> Updated **project**: `conventions#naming` — snake_case to kebab-case
+> Updated **project**: naming conventions changed from snake_case to kebab-case
 
 ## Bulk Updates
 
@@ -69,7 +67,7 @@ After a major refactor, multiple memories may be stale. Handle systematically:
 
 ```bash
 fmemory discover
-fmemory recall --category "project" --limit 50
+fmemory recall --category project --limit 50
 ```
 
 ### Step 2: Identify Stale Entries
@@ -82,10 +80,10 @@ List all changes for user review before executing:
 
 ```
 Found 4 stale memories after the ferridyn rename:
-  1. project/conventions#crate-name: "dynamite" → "ferridyn"
-  2. project/structure#binary-names: "dynamite-cli" → "ferridyn-memory-cli"
-  3. project/architecture#socket-path: "~/.local/share/dynamite/" → "~/.local/share/ferridyn/"
-  4. decisions/naming#project-name: "DynaMite" → "FerridynDB"
+  1. project/structure: "dynamite" -> "ferridyn"
+  2. project/binaries: "dynamite-cli" -> "fmemory"
+  3. project/socket-path: "~/.local/share/dynamite/" -> "~/.local/share/ferridyn/"
+  4. decisions/naming: "DynaMite" -> "FerridynDB"
 
 Proceed with all updates?
 ```
@@ -106,6 +104,6 @@ Example:
 
 ## What NOT to Update
 
-- Schema entries (`_schema` category) — use `fmemory define` to change schemas
+- Schemas — use `fmemory define` to change schemas and attributes
 - Memories you're uncertain about — ask first
 - Entries that may be intentionally historical ("we chose X over Y in 2024" is still valid even if X changed)

@@ -14,10 +14,9 @@ import type {
 // Prompts
 // ---------------------------------------------------------------------------
 
-const RETRIEVAL_PROMPT = `You are a memory retrieval assistant. Given a user prompt and a memory index, select which memory categories and optional prefixes are most relevant to the prompt.
+const RETRIEVAL_PROMPT = `You are a memory retrieval assistant. Given a user prompt and a memory index, select which memory categories are most relevant to the prompt.
 
-Return a JSON array of objects: [{"category": "...", "prefix": "..."}]
-- "prefix" is optional — omit it to fetch all entries in the category.
+Return a JSON array of objects: [{"category": "..."}]
 - Return an empty array [] if no memories are relevant.
 - Be selective: only return categories that are clearly related to the prompt.
 - Maximum 5 entries.`;
@@ -32,8 +31,10 @@ You have access to persistent memory via the fmemory CLI. Use it proactively:
 - The user says "remember that...", "note that...", "keep in mind...", or "from now on..."
 - You fix a tricky bug (store the pattern and fix)
 - You discover a convention, gotcha, or non-obvious behavior
+- Syntax: \`fmemory remember --category <cat> "Natural language description"\`
+- Or let the system infer the category: \`fmemory remember "Natural language description"\`
 
-**RETRIEVE** — Run \`fmemory recall\` when:
+**RETRIEVE** — Run \`fmemory recall --query "..."\` when:
 - You're starting complex work and need background context
 - You need to know project conventions, architecture decisions, or user preferences
 - The user asks about something that might be stored in memory
@@ -66,31 +67,18 @@ async function main(): Promise<void> {
   // Step 1-4: Try to discover and fetch relevant memories.
   const memories: MemoryGroup[] = [];
   try {
-    // Step 1: Discover all categories.
-    const categories = (await runCli(["discover"])) as string[];
+    // Step 1: Discover all categories (enriched objects).
+    const discoverResult = (await runCli(["discover"])) as Array<{
+      name: string;
+      description?: string;
+      attribute_count?: number;
+      index_count?: number;
+    }>;
 
-    if (Array.isArray(categories) && categories.length > 0) {
-      // Step 2: Build memory index (categories + their prefixes).
-      const index: Record<string, string[]> = {};
-      for (const cat of categories) {
-        const catName = typeof cat === "string" ? cat : String(cat);
-        try {
-          const prefixes = (await runCli([
-            "discover",
-            "--category",
-            catName,
-          ])) as string[];
-          index[catName] = Array.isArray(prefixes) ? prefixes : [];
-        } catch {
-          index[catName] = [];
-        }
-      }
-
-      const indexText = Object.entries(index)
-        .map(
-          ([cat, pfxs]) =>
-            `- ${cat}: [${pfxs.map((p) => (typeof p === "string" ? p : String(p))).join(", ")}]`,
-        )
+    if (Array.isArray(discoverResult) && discoverResult.length > 0) {
+      // Step 2: Build memory index (categories + their keys).
+      const indexText = discoverResult
+        .map((c) => `- ${c.name}: ${c.description || "(no description)"}`)
         .join("\n");
 
       // Step 3: Select relevant memories.
@@ -104,22 +92,19 @@ async function main(): Promise<void> {
       selections = parseJsonFromText(llmResponse ?? "") as MemorySelection[];
 
       if (!Array.isArray(selections) || selections.length === 0) {
-        // Fallback: fetch from all categories (limited to 5 per category).
-        selections = categories
+        // Fallback: fetch from all categories (limited to 5).
+        selections = discoverResult
           .slice(0, 5)
-          .map((c) => ({ category: typeof c === "string" ? c : String(c) }));
+          .map((c) => ({ category: c.name }));
       }
 
       // Step 4: Fetch selected memories.
       for (const sel of selections.slice(0, 5)) {
         try {
           const args = ["recall", "--category", sel.category, "--limit", "10"];
-          if (sel.prefix) {
-            args.push("--prefix", sel.prefix);
-          }
           const items = (await runCli(args)) as MemoryItem[];
           if (Array.isArray(items) && items.length > 0) {
-            memories.push({ category: sel.category, prefix: sel.prefix, items });
+            memories.push({ category: sel.category, items });
           }
         } catch {
           // Skip failures.
@@ -133,16 +118,18 @@ async function main(): Promise<void> {
   // Step 5: Build output — always include protocol, optionally include memories.
   let context: string;
   if (memories.length > 0) {
-    const contextParts = memories.map(({ category, prefix, items }) => {
-      const header = prefix ? `${category} (${prefix})` : category;
+    const contextParts = memories.map(({ category, items }) => {
       const entries = items
         .map((item) => {
           const key = item.key || "?";
-          const content = item.content || JSON.stringify(item);
-          return `  - [${key}]: ${content}`;
+          const attrs = Object.entries(item)
+            .filter(([k]) => k !== "category" && k !== "key")
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          return `  - [${key}]: ${attrs || "(empty)"}`;
         })
         .join("\n");
-      return `## ${header}\n${entries}`;
+      return `## ${category}\n${entries}`;
     });
 
     context = `# Recalled Memories\n\n${contextParts.join("\n\n")}\n\n${MEMORY_PROTOCOL}`;

@@ -12,7 +12,6 @@ name = "fmemory"
 path = "src/cli.rs"
 
 [dependencies]
-ferridyn-core = { git = "https://github.com/AetherXHub/ferridyndb" }
 ferridyn-server = { git = "https://github.com/AetherXHub/ferridyndb" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -23,10 +22,10 @@ clap = { version = "4", features = ["derive"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 async-trait = "0.1"
-regex = "1"
-indexmap = { version = "2", features = ["serde"] }
 tracing = "0.1"
+chrono = "0.4"
 
 [dev-dependencies]
+ferridyn-core = { git = "https://github.com/AetherXHub/ferridyndb" }
 tempfile = "3"
 tokio = { version = "1", features = ["full", "test-util"] }

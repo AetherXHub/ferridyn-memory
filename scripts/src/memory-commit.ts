@@ -22,15 +22,14 @@ Return a JSON array of memory entries to store:
 [
   {
     "category": "category-name",
-    "key": "hierarchical#key#name",
-    "content": "The memory content to store"
+    "input": "Natural language description of the memory"
   }
 ]
 
 Guidelines:
-- Use existing categories when appropriate, or create new descriptive ones.
-- Keys should use '#' as a hierarchy separator (e.g., "rust#ownership#rules").
-- Content should be concise but self-contained.
+- Use existing categories when appropriate, or let the system infer one.
+- "input" should be a natural language sentence describing the memory.
+- The system will automatically extract structured attributes and generate a key.
 - Focus on: architecture decisions, user preferences, bug fixes, learned patterns, project-specific knowledge.
 - Skip: trivial exchanges, greetings, status updates.
 - Return an empty array [] if nothing worth remembering.
@@ -60,9 +59,9 @@ async function main(): Promise<void> {
   // Step 2: Get existing categories for context.
   let categories: string[] = [];
   try {
-    const cats = (await runCli(["discover"])) as string[];
+    const cats = (await runCli(["discover"])) as Array<{ name: string }>;
     if (Array.isArray(cats)) {
-      categories = cats.map((c) => (typeof c === "string" ? c : String(c)));
+      categories = cats.map((c) => c.name);
     }
   } catch {
     // No existing categories — that's fine.
@@ -114,26 +113,14 @@ async function main(): Promise<void> {
   // Step 5: Store each extracted memory.
   let stored = 0;
   for (const mem of memories.slice(0, 10)) {
-    if (!mem.category || !mem.key || !mem.content) continue;
+    if (!mem.category || !mem.input) continue;
     try {
-      const args = [
-        "remember",
-        "--category",
-        mem.category,
-        "--key",
-        mem.key,
-        "--content",
-        mem.content,
-      ];
-      if (mem.metadata) {
-        args.push("--metadata", mem.metadata);
-      }
-      await runCli(args);
+      await runCli(["remember", "--category", mem.category, mem.input]);
       stored++;
     } catch (err: unknown) {
       const error = err as Error;
       process.stderr.write(
-        `memory-commit: failed to store ${mem.category}#${mem.key}: ${error.message}\n`,
+        `memory-commit: failed to store in ${mem.category}: ${error.message}\n`,
       );
     }
   }

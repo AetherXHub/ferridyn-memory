@@ -210,9 +210,9 @@ save_setup_progress 3
 Test store, recall, and cleanup:
 
 ```bash
-"$PLUGIN_ROOT/target/release/fmemory" remember --category _setup-test --key check --content "Setup verification"
+"$PLUGIN_ROOT/target/release/fmemory" remember --category _setup-test "Setup verification test"
 "$PLUGIN_ROOT/target/release/fmemory" recall --category _setup-test
-"$PLUGIN_ROOT/target/release/fmemory" forget --category _setup-test --key check
+"$PLUGIN_ROOT/target/release/fmemory" forget --category _setup-test --key setup-verification-test
 ```
 
 All three commands must succeed. If any fails, stop and report. Save progress:
@@ -266,7 +266,7 @@ NEXT STEP
 
 If `ANTHROPIC_API_KEY` is set in the environment, add:
 
-> **Schema-aware memory is active.** fmemory uses Claude Haiku for automatic schema inference, key validation, and natural language recall resolution.
+> **Structured memory is active.** fmemory uses Claude Haiku for automatic schema inference (typed attributes and secondary indexes), natural language parsing, and query resolution.
 
 ## Help Text
 
@@ -284,8 +284,9 @@ WHAT IT DOES:
   2. Installs npm deps and builds TypeScript hook scripts (tsup)
   3. Builds CLI binary (fmemory) and installs ferridyn-server from ferridyndb repo
   4. Creates data directory (~/.local/share/ferridyn)
-  5. Starts the FerridynDB server daemon
+  5. Starts the FerridynDB server daemon (required — fmemory is server-only)
   6. Verifies round-trip memory storage
+  7. Native partition schemas and secondary indexes are auto-created on first writes
 
 PREREQUISITES:
   - Rust toolchain (https://rustup.rs)

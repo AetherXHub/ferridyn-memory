@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-FerridynDB Memory is a Claude Code plugin that gives Claude persistent, schema-aware memory backed by the FerridynDB embedded database. It stores and retrieves memories via a CLI (`fmemory`), with automatic context retrieval before each prompt and learning extraction before conversation compaction.
+FerridynDB Memory is a Claude Code plugin that gives Claude persistent, structured memory backed by the FerridynDB database server. It stores and retrieves memories via a CLI (`fmemory`), with automatic context retrieval before each prompt and learning extraction before conversation compaction.
 
 ## Why
 
-Claude Code sessions are ephemeral — knowledge is lost when conversations end or compact. This plugin solves that by persisting structured memories (decisions, contacts, project knowledge, patterns) in a local FerridynDB database. Memories are organized by category with hierarchical sort keys, and the system uses Claude Haiku to automatically infer schemas, validate keys, and resolve natural language queries to the right data.
+Claude Code sessions are ephemeral — knowledge is lost when conversations end or compact. This plugin solves that by persisting structured memories (decisions, contacts, project knowledge, patterns) in a local FerridynDB database via the `ferridyn-server` daemon. Memories are organized by category with typed attributes, and the system uses Claude Haiku to automatically infer schemas (with typed attributes and secondary indexes), parse natural language input, and resolve queries to the right data.
 
 ## Build Commands
 
@@ -17,15 +17,15 @@ Claude Code sessions are ephemeral — knowledge is lost when conversations end 
 - `npm run build:all` — build scripts + Rust binaries (full build)
 - `cargo build` — compile the plugin (fmemory CLI)
 - `cargo build --release` — release build (required for plugin deployment)
-- `cargo test` — run all tests (41 tests)
+- `cargo test` — run all tests (25 tests)
 - `cargo clippy -- -D warnings` — lint
 - `cargo fmt --check` — check formatting
 
 ## How It Works
 
-### Two Operational Modes
+### Server-Only Architecture
 
-The CLI tries to connect to a running `ferridyn-server` via Unix socket first. If no server is available, it falls back to opening the database file directly (exclusive file lock).
+The CLI connects to a running `ferridyn-server` via Unix socket. The server must be running.
 
 ```
 ferridyn-server (background daemon, owns DB file)
@@ -34,14 +34,13 @@ ferridyn-server (background daemon, owns DB file)
     +-- fmemory          (CLI: human use, hooks, Claude via Bash)
 ```
 
-### Schema-Aware Memory
+### Structured Memory with Native Schemas
 
-Each memory category can have a schema defining its sort key format:
-- **Auto-inference** — On first write to a new category, Claude Haiku infers the schema from the data
-- **Validation** — Subsequent writes are checked against the schema's expected key format
-- **NL resolution** — Natural language queries like "Toby's email" are resolved to `category=people, prefix=toby` using schemas as context
-
-Schemas are stored in a `_schema` meta-category within the same database.
+Each memory category can have a native partition schema with typed attributes and secondary indexes:
+- **Auto-inference** — On first write to a new category, Claude Haiku infers typed attributes (e.g., `name: STRING`, `email: STRING`) and suggests secondary indexes
+- **NL parsing** — Natural language input like "Toby is a backend engineer" is parsed into structured attributes
+- **Index-optimized queries** — Natural language queries like "Toby's email" are resolved using secondary indexes when available for fast attribute-based lookups
+- **Structured data** — Items have typed attributes (name, email, role), not flat content strings. Keys are simple identifiers (`toby`), not hierarchical formats.
 
 ### CLI Commands
 
@@ -49,18 +48,18 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 
 | Command | Purpose |
 |---------|---------|
-| `remember` | Store a memory (auto-infers schema on first write to a category) |
-| `recall` | Retrieve memories by category+prefix or natural language query |
-| `discover` | Browse categories with schema descriptions, drill into key prefixes |
+| `remember` | Store a memory — NL-first (auto-infers schema with typed attributes and indexes on first write) |
+| `recall` | Retrieve memories by category+key, category scan, or NL query (index-optimized) |
+| `discover` | Browse categories with schema descriptions, attribute counts, and index counts |
 | `forget` | Remove a specific memory by category and key |
-| `define` | Explicitly define or update a category's key schema |
-| `schema` | View schema for a category |
-| NL-first mode | `fmemory "natural language query"` — resolves to recall or other command |
+| `define` | Explicitly define or update a category's schema with typed attributes |
+| `schema` | View schema for a category (attributes, indexes) |
+| NL-first mode | `fmemory "natural language query"` — resolves to recall |
 
 ### Hooks (3)
 
-- **UserPromptSubmit** (`memory-retrieval.ts`) — Before each prompt, discovers stored memories, selects relevant ones via Haiku, injects as context. Also injects the **Memory Protocol** — behavioral guidance that tells the agent when to proactively commit, retrieve, and correct memories mid-conversation.
-- **PreCompact** (`memory-commit.ts`) — Before conversation compaction, extracts key learnings from the transcript via Haiku and persists them
+- **UserPromptSubmit** (`memory-retrieval.ts`) — Before each prompt, discovers stored memories, selects relevant ones via Haiku, injects structured items as context. Also injects the **Memory Protocol** — behavioral guidance that tells the agent when to proactively commit, retrieve, and correct memories mid-conversation.
+- **PreCompact** (`memory-commit.ts`) — Before conversation compaction, extracts key learnings from the transcript via Haiku and persists them using NL-first store format
 - **Stop** (`memory-reflect.ts`) — When a session ends, reflects on the conversation and persists high-level learnings (decisions, patterns, preferences). Complementary to PreCompact — focuses on big-picture takeaways rather than granular facts.
 
 ### Skills (13)
@@ -75,7 +74,7 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 | `forget` | Safe memory removal workflow |
 | `browse` | Interactive memory exploration |
 | `learn` | Deep codebase exploration that builds persistent project memory |
-| `health` | Memory integrity diagnostics — schema coverage, empty categories, issues |
+| `health` | Memory integrity diagnostics — schema coverage, index coverage, empty categories, issues |
 
 #### Proactive Skills (agent auto-triggered + user-invokable)
 
@@ -92,11 +91,11 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 
 ```
 src/
-  schema.rs    — Schema system: CategorySchema, SchemaStore, inference, NL query resolution, validation
+  schema.rs    — SchemaManager: InferredSchema, ResolvedQuery, LLM prompts for schema inference, NL parsing, and query resolution
   llm.rs       — LlmClient trait + AnthropicClient (Claude Haiku) + MockLlmClient for tests
-  backend.rs   — MemoryBackend enum: Direct(FerridynDB) | Server(FerridynClient) — unified async API
-  lib.rs       — Shared: socket/DB path resolution, table initialization, env var handling
-  cli.rs       — fmemory binary: CLI with NL-first mode, schema inference, and --json output
+  backend.rs   — MemoryBackend: server-only (FerridynClient), schema/index creation methods
+  lib.rs       — Shared: socket path resolution, table initialization, env var handling
+  cli.rs       — fmemory binary: NL-first writes, index-optimized reads, prose output, --json flag
   error.rs     — Error types
 ```
 
@@ -120,29 +119,27 @@ scripts/
 
 ## Dependencies
 
-This crate depends on `ferridyn-core` and `ferridyn-server` from the [ferridyndb](https://github.com/AetherXHub/ferridyndb) repository via git dependencies. For local development against a local ferridyndb checkout, uncomment the `[patch]` section in `.cargo/config.toml`.
+This crate depends on `ferridyn-server` from the [ferridyndb](https://github.com/AetherXHub/ferridyndb) repository via git dependency. `ferridyn-core` is a dev-only dependency (used in tests). For local development against a local ferridyndb checkout, uncomment the `[patch]` section in `.cargo/config.toml`.
 
 ### Key crates
-- `ferridyn-core` / `ferridyn-server` — Database engine and client
+- `ferridyn-server` — Database server client
+- `ferridyn-core` — Database engine (dev-only, for tests)
 - `tokio` — Async runtime
 - `reqwest` — HTTP client for Anthropic API calls
 - `clap` — CLI argument parsing
-- `regex` — Sort key format validation
-- `indexmap` — Ordered maps for schema segments
 
 ## Environment Variables
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference and NL recall |
+| `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference, NL parsing, and query resolution |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
-| `FERRIDYN_MEMORY_DB` | No | Override database file path (default: `~/.local/share/ferridyn/memory.db`) |
 | `FERRIDYN_MEMORY_CLI` | No | Override `fmemory` binary path (used by hook scripts) |
 
 ## Development Process
 
 1. **Build scripts** — `npm run build:scripts` must produce 5 `.mjs` files in `scripts/dist/`
 2. **Build Rust** — `cargo build` must pass
-3. **Test** — `cargo test` must pass (41 tests covering schema validation, LLM mocking, CLI command handlers, backend operations)
+3. **Test** — `cargo test` must pass (25 tests covering schema inference, LLM mocking, CLI command handlers, backend operations)
 4. **Lint** — `cargo clippy -- -D warnings` must pass
 5. **Format** — `cargo fmt --check` must pass

@@ -21,26 +21,22 @@ export interface PromptHookOutput {
   };
 }
 
-// Memory item as returned by the CLI
+// Memory item as returned by the CLI (dynamic typed attributes)
 export interface MemoryItem {
   category: string;
   key: string;
-  content: string;
-  metadata?: string;
+  [attribute: string]: unknown;
 }
 
 // Selection for retrieval (from Haiku)
 export interface MemorySelection {
   category: string;
-  prefix?: string;
 }
 
-// Memory to extract and store (from Haiku)
+// Memory to extract and store (NL input format)
 export interface ExtractedMemory {
   category: string;
-  key: string;
-  content: string;
-  metadata?: string;
+  input: string;
 }
 
 // Transcript entry from JSONL file
@@ -58,7 +54,6 @@ export interface TranscriptEntry {
 // Fetched memory group (category + items)
 export interface MemoryGroup {
   category: string;
-  prefix?: string;
   items: MemoryItem[];
 }
 
@@ -73,7 +68,7 @@ export interface CategoryHealth {
   name: string;
   entries: number;
   has_schema: boolean;
-  prefixes: string[];
+  has_indexes: boolean;
 }
 
 export interface HealthReport {
@@ -88,9 +83,9 @@ export interface HealthReport {
 export interface CategoryStats {
   name: string;
   description: string;
-  key_format: string;
+  attribute_count: number;
+  index_count: number;
   entry_count: number;
-  prefixes: string[];
   sample_keys: string[];
 }
 

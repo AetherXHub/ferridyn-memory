@@ -1,13 +1,13 @@
 # FerridynDB Memory Plugin for Claude Code
 
-Persistent, schema-aware memory for Claude Code backed by [FerridynDB](https://github.com/AetherXHub/ferridyndb). Memories survive across sessions and conversation compactions — decisions, contacts, project knowledge, patterns, and preferences are stored locally and recalled automatically.
+Persistent, structured memory for Claude Code backed by [FerridynDB](https://github.com/AetherXHub/ferridyndb). Memories survive across sessions and conversation compactions — decisions, contacts, project knowledge, patterns, and preferences are stored locally with typed attributes and recalled automatically via secondary indexes.
 
 ## What It Does
 
 - **CLI interface** — `fmemory` command with 6 subcommands plus natural-language-first mode available to Claude via Bash
 - **3 hooks** — auto-retrieve context before each prompt, save learnings before compaction, reflect on sessions at exit
 - **13 skills** — proactive agent behaviors (teach, reflect, context, update, decide, status) plus core workflows (setup, remember, recall, forget, browse, learn, health)
-- **Schema-aware** — Claude Haiku auto-infers category schemas on first write, validates keys, and resolves natural language queries
+- **Structured data with native schemas** — Claude Haiku auto-infers typed attributes and secondary indexes on first write, parses NL input, and resolves queries via indexes
 
 ## Install
 
@@ -39,15 +39,15 @@ ferridyn-server (background daemon, owns DB file)
     +-- fmemory          (CLI: human use, hooks, Claude via Bash)
 ```
 
-The CLI tries the server socket first. If unavailable, it falls back to opening the database file directly (exclusive file lock).
+The CLI connects to the server via Unix socket. The server must be running.
 
-### Schema-Aware Memory
+### Structured Memory with Native Schemas
 
-Each category can have a schema defining its sort key format:
+Each category can have a native partition schema with typed attributes and secondary indexes:
 
-- **Auto-inference** — On first write to a new category, Claude Haiku infers the schema
-- **Validation** — Subsequent writes are checked against the expected key format
-- **NL resolution** — Natural language queries like "Toby's email" resolve to `category=people, prefix=toby`
+- **Auto-inference** — On first write to a new category, Claude Haiku infers typed attributes and suggests secondary indexes
+- **NL parsing** — Natural language input is parsed into structured attributes
+- **Index-optimized queries** — NL queries like "Toby's email" are resolved using secondary indexes for fast attribute-based lookups
 
 ## CLI Commands
 
@@ -55,13 +55,13 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 
 | Command | Purpose |
 |---------|---------|
-| `remember` | Store a memory (auto-infers schema on first write) |
-| `recall` | Retrieve memories by category+prefix or natural language query |
-| `discover` | Browse categories with schema descriptions, drill into key prefixes |
+| `remember` | Store a memory — NL-first (auto-infers schema with typed attributes and indexes on first write) |
+| `recall` | Retrieve memories by category+key, category scan, or NL query (index-optimized) |
+| `discover` | Browse categories with schema descriptions, attribute counts, and index counts |
 | `forget` | Remove a specific memory by category and key |
-| `define` | Explicitly define or update a category's key schema |
-| `schema` | View schema for a category |
-| NL-first mode | `fmemory "natural language query"` — resolves to recall or other command |
+| `define` | Explicitly define or update a category's schema with typed attributes |
+| `schema` | View schema for a category (attributes, indexes) |
+| NL-first mode | `fmemory "natural language query"` — resolves to recall |
 
 ## Hooks
 
@@ -102,17 +102,16 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 |----------|----------|---------|
 | `ANTHROPIC_API_KEY` | Yes | Claude Haiku for schema inference, NL recall, and hook scripts |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
-| `FERRIDYN_MEMORY_DB` | No | Override database file path (default: `~/.local/share/ferridyn/memory.db`) |
 | `FERRIDYN_MEMORY_CLI` | No | Override `fmemory` binary path (used by hook scripts) |
 
 ## Project Structure
 
 ```
 src/
-  schema.rs           — Schema system: inference, validation, NL resolution
+  schema.rs           — SchemaManager: schema inference, NL parsing, query resolution
   llm.rs              — LLM client (Claude Haiku) + mock for tests
-  backend.rs          — MemoryBackend: Direct(FerridynDB) | Server(FerridynClient)
-  cli.rs              — fmemory binary: CLI with NL-first mode and --json output
+  backend.rs          — MemoryBackend: server-only (FerridynClient), schema/index methods
+  cli.rs              — fmemory binary: NL-first writes, index-optimized reads, prose output
   lib.rs              — Shared utilities
 scripts/
   src/                — TypeScript source (compiled by tsup)
@@ -136,7 +135,7 @@ hooks/hooks.json      — Hook configuration
 npm install                       # install tsup + typescript
 npm run build:scripts             # compile TypeScript hooks to scripts/dist/
 cargo build                       # compile Rust binaries
-cargo test                        # run tests (41 tests)
+cargo test                        # run tests (25 tests)
 cargo clippy -- -D warnings       # lint
 cargo fmt --check                 # check formatting
 ```

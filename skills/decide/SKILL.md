@@ -40,7 +40,7 @@ You do NOT need to wait for `/ferridyn-memory:decide` — log decisions as they 
 Before logging, check if there's an existing decision in the same area:
 
 ```bash
-fmemory recall --category "decisions" --prefix "{area}"
+fmemory recall --query "decisions about {area}"
 ```
 
 If a prior decision exists in the same area, note whether the new decision supersedes, refines, or conflicts with it.
@@ -57,43 +57,28 @@ A well-structured decision memory includes:
 
 ### Step 3: Store
 
+Store as a descriptive NL document. The system extracts structured attributes (decision, rationale, alternatives, constraints) automatically:
+
 ```bash
-fmemory remember --category "decisions" --key "{area}#{decision-name}" \
-  --content "Decision: {what was decided}
-Rationale: {why}
-Alternatives considered: {what else, why rejected}
-Constraints: {what shaped this}" \
-  --metadata "source: conversation, {date}"
+fmemory remember --category decisions "JWT refresh strategy: Chose 15-minute access tokens with 7-day refresh tokens. Rationale: balance security and UX for serverless deployment. Alternatives considered: session cookies (rejected, incompatible with serverless), long-lived tokens (rejected, security risk). Constraints: must work across multiple API gateways."
 ```
 
 ### Step 4: Confirm
 
-> Logged decision: **decisions** `auth#jwt-refresh-strategy`
-> Chose 15-minute access tokens with 7-day refresh tokens. Alternatives: session cookies (rejected — serverless), long-lived tokens (rejected — security).
-
-## Key Format Convention
-
-The `decisions` category uses `{area}#{decision-name}`:
-
-| Area | Example Keys |
-|------|-------------|
-| `auth` | `auth#token-strategy`, `auth#provider-selection` |
-| `database` | `database#engine-choice`, `database#schema-migration-tool` |
-| `api` | `api#versioning-strategy`, `api#error-format` |
-| `frontend` | `frontend#state-management`, `frontend#css-approach` |
-| `infra` | `infra#hosting-provider`, `infra#ci-cd-pipeline` |
-| `testing` | `testing#framework-choice`, `testing#coverage-strategy` |
-| `architecture` | `architecture#monolith-vs-micro`, `architecture#event-driven` |
+> Logged decision: **decisions** — JWT refresh strategy
+> Chose 15-minute access tokens with 7-day refresh tokens. Alternatives: session cookies (rejected, serverless), long-lived tokens (rejected, security).
 
 ## Decision Content Template
 
-For consistency, structure decision content as:
+For consistency, structure decision content as a descriptive paragraph including:
 
 ```
-Decision: Use Postgres with Diesel ORM
-Rationale: Need ACID transactions for payment processing; Diesel provides compile-time query validation
-Alternatives: SQLite (insufficient concurrency), MongoDB (no ACID), raw SQL (maintenance burden)
-Constraints: Must support concurrent writes from 3 services; team familiar with SQL
+{area}: {decision summary}. Rationale: {why}. Alternatives considered: {what else, why rejected}. Constraints: {what shaped this}.
+```
+
+Example:
+```
+Database engine: Use Postgres with Diesel ORM. Rationale: need ACID transactions for payment processing, Diesel provides compile-time query validation. Alternatives: SQLite (insufficient concurrency), MongoDB (no ACID), raw SQL (maintenance burden). Constraints: must support concurrent writes from 3 services, team familiar with SQL.
 ```
 
 ## Superseding Decisions
@@ -101,8 +86,8 @@ Constraints: Must support concurrent writes from 3 services; team familiar with 
 When a new decision replaces an old one:
 
 1. Recall the old decision
-2. Store the new decision with the same key (overwrites)
-3. Include "Supersedes: {old decision summary}" in the content
+2. Forget it
+3. Store the new decision, including "Supersedes: {old decision summary}" in the content
 4. Mention why the original decision was revisited
 
 ## Integration with Reflect

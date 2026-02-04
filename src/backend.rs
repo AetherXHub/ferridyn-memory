@@ -1,4 +1,4 @@
-//! Backend abstraction: direct FerridynDB handle or server client.
+//! Backend abstraction: server client (production) or direct FerridynDB handle (tests only).
 
 use std::sync::Arc;
 
@@ -6,17 +6,20 @@ use crate::error::MemoryError;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
+#[cfg(test)]
 use ferridyn_core::api::FerridynDB;
 use ferridyn_server::FerridynClient;
+use ferridyn_server::client::{AttributeDefInput, IndexInfo, PartitionSchemaInfo};
 
 use crate::TABLE_NAME;
 
 /// Unified backend for memory operations.
 ///
-/// `Direct` uses an in-process FerridynDB handle (exclusive file lock).
-/// `Server` uses a FerridynClient connected to a running `ferridyn-server`.
+/// In production, only the `Server` variant is available.
+/// The `Direct` variant exists for tests that need an in-process database.
 #[derive(Clone)]
 pub enum MemoryBackend {
+    #[cfg(test)]
     Direct(FerridynDB),
     Server(Arc<Mutex<FerridynClient>>),
 }
@@ -24,6 +27,7 @@ pub enum MemoryBackend {
 impl MemoryBackend {
     pub async fn put_item(&self, doc: Value) -> Result<(), MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => db.put_item(TABLE_NAME, doc).map_err(mcp_core_err),
             Self::Server(client) => client
                 .lock()
@@ -36,6 +40,7 @@ impl MemoryBackend {
 
     pub async fn get_item(&self, category: &str, key: &str) -> Result<Option<Value>, MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => db
                 .get_item(TABLE_NAME)
                 .partition_key(category)
@@ -62,6 +67,7 @@ impl MemoryBackend {
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => {
                 let mut builder = db.query(TABLE_NAME).partition_key(partition_key);
                 if let Some(pfx) = prefix {
@@ -95,6 +101,7 @@ impl MemoryBackend {
 
     pub async fn delete_item(&self, category: &str, key: &str) -> Result<(), MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => db
                 .delete_item(TABLE_NAME)
                 .partition_key(category)
@@ -116,6 +123,7 @@ impl MemoryBackend {
 
     pub async fn list_partition_keys(&self, limit: usize) -> Result<Vec<Value>, MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => db
                 .list_partition_keys(TABLE_NAME)
                 .limit(limit)
@@ -136,6 +144,7 @@ impl MemoryBackend {
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
         match self {
+            #[cfg(test)]
             Self::Direct(db) => db
                 .list_sort_key_prefixes(TABLE_NAME)
                 .partition_key(category)
@@ -154,10 +163,170 @@ impl MemoryBackend {
                 .map_err(mcp_client_err),
         }
     }
+
+    // -- Partition schema operations --
+
+    pub async fn create_schema(
+        &self,
+        prefix: &str,
+        description: Option<&str>,
+        attrs: &[AttributeDefInput],
+        validate: bool,
+    ) -> Result<(), MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "schema operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .create_schema(TABLE_NAME, prefix, description, attrs, validate)
+                .await
+                .map_err(|e| MemoryError::Schema(e.to_string())),
+        }
+    }
+
+    pub async fn describe_schema(&self, prefix: &str) -> Result<PartitionSchemaInfo, MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "schema operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .describe_schema(TABLE_NAME, prefix)
+                .await
+                .map_err(|e| MemoryError::Schema(e.to_string())),
+        }
+    }
+
+    pub async fn list_schemas(&self) -> Result<Vec<PartitionSchemaInfo>, MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "schema operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .list_schemas(TABLE_NAME)
+                .await
+                .map_err(|e| MemoryError::Schema(e.to_string())),
+        }
+    }
+
+    pub async fn drop_schema(&self, prefix: &str) -> Result<(), MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "schema operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .drop_schema(TABLE_NAME, prefix)
+                .await
+                .map_err(|e| MemoryError::Schema(e.to_string())),
+        }
+    }
+
+    // -- Secondary index operations --
+
+    pub async fn create_index(
+        &self,
+        name: &str,
+        partition_schema: &str,
+        key_name: &str,
+        key_type: &str,
+    ) -> Result<(), MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "index operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .create_index(TABLE_NAME, name, partition_schema, key_name, key_type)
+                .await
+                .map_err(|e| MemoryError::Index(e.to_string())),
+        }
+    }
+
+    pub async fn list_indexes(&self) -> Result<Vec<IndexInfo>, MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "index operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .list_indexes(TABLE_NAME)
+                .await
+                .map_err(|e| MemoryError::Index(e.to_string())),
+        }
+    }
+
+    pub async fn describe_index(&self, name: &str) -> Result<IndexInfo, MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "index operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .describe_index(TABLE_NAME, name)
+                .await
+                .map_err(|e| MemoryError::Index(e.to_string())),
+        }
+    }
+
+    pub async fn drop_index(&self, name: &str) -> Result<(), MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "index operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => client
+                .lock()
+                .await
+                .drop_index(TABLE_NAME, name)
+                .await
+                .map_err(|e| MemoryError::Index(e.to_string())),
+        }
+    }
+
+    pub async fn query_index(
+        &self,
+        index_name: &str,
+        key_value: Value,
+        limit: Option<usize>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        match self {
+            #[cfg(test)]
+            Self::Direct(_) => Err(MemoryError::Internal(
+                "index operations not supported in direct mode".into(),
+            )),
+            Self::Server(client) => {
+                let result = client
+                    .lock()
+                    .await
+                    .query_index(TABLE_NAME, index_name, key_value, limit, None)
+                    .await
+                    .map_err(|e| MemoryError::Index(e.to_string()))?;
+                Ok(result.items)
+            }
+        }
+    }
 }
 
+#[cfg(test)]
 fn mcp_core_err(err: ferridyn_core::error::Error) -> MemoryError {
-    MemoryError::Database(format!("{err}"))
+    MemoryError::Internal(format!("{err}"))
 }
 
 fn mcp_client_err(err: ferridyn_server::error::ClientError) -> MemoryError {

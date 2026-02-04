@@ -18,12 +18,12 @@ Use the `fmemory forget` command to remove specific memories.
 
 Before deleting, always confirm with the user what will be removed. Show the exact category and key.
 
-For bulk deletion (removing all entries with a prefix), use `fmemory discover` first to list what will be affected, then delete one by one after confirmation.
+For bulk deletion (removing all entries in a category), use `fmemory discover` first to list what will be affected, then delete one by one after confirmation.
 
 ## Usage
 
 ```bash
-fmemory forget --category "people" --key "toby#old-email"
+fmemory forget --category contacts --key toby
 ```
 
 ## Workflow: Correct a Memory
@@ -33,12 +33,11 @@ fmemory forget --category "people" --key "toby#old-email"
 3. Remember the corrected entry
 
 ```bash
-fmemory recall --category "people" --prefix "toby#email"
-fmemory forget --category "people" --key "toby#email"
-fmemory remember --category "people" --key "toby#email" --content "new-email@example.com"
+fmemory recall --category contacts --key toby
+fmemory forget --category contacts --key toby
+fmemory remember --category contacts --key toby "backend engineer at New Corp, email toby@newcorp.com"
 ```
 
 ## Restrictions
 
-- Cannot delete from the `_schema` category directly
 - Deleting a non-existent key silently succeeds (idempotent)

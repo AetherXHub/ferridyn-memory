@@ -24,8 +24,7 @@ Return a JSON array of memory entries to store:
 [
   {
     "category": "category-name",
-    "key": "hierarchical#key#name",
-    "content": "The memory content — include the WHY, not just the WHAT"
+    "input": "Natural language description — include the WHY, not just the WHAT"
   }
 ]
 
@@ -53,9 +52,9 @@ async function main(): Promise<void> {
   // Get existing categories for context
   let categories: string[] = [];
   try {
-    const cats = await runCli(["discover"]) as string[];
+    const cats = await runCli(["discover"]) as Array<{ name: string }>;
     if (Array.isArray(cats)) {
-      categories = cats.map((c) => (typeof c === "string" ? c : String(c)));
+      categories = cats.map((c) => c.name);
     }
   } catch {
     // No existing categories — fine
@@ -102,22 +101,13 @@ async function main(): Promise<void> {
   // Store each reflection
   let stored = 0;
   for (const mem of memories.slice(0, 5)) {
-    if (!mem.category || !mem.key || !mem.content) continue;
+    if (!mem.category || !mem.input) continue;
     try {
-      const args = [
-        "remember",
-        "--category", mem.category,
-        "--key", mem.key,
-        "--content", mem.content,
-      ];
-      if (mem.metadata) {
-        args.push("--metadata", mem.metadata);
-      }
-      await runCli(args);
+      await runCli(["remember", "--category", mem.category, mem.input]);
       stored++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`memory-reflect: failed to store ${mem.category}#${mem.key}: ${message}\n`);
+      process.stderr.write(`memory-reflect: failed to store in ${mem.category}: ${message}\n`);
     }
   }
 

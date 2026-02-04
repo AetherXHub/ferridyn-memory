@@ -1,11 +1,11 @@
 ---
 name: browse
-description: Interactively explore the memory structure — list categories, inspect schemas, drill into entries.
+description: Interactively explore the memory structure — list categories, inspect schemas and indexes, drill into entries.
 ---
 
 # Browse — Explore Memory Structure
 
-Use the `fmemory discover` command to navigate the memory hierarchy.
+Use the `fmemory discover` command to navigate the memory structure.
 
 ## Exploration Workflow
 
@@ -15,48 +15,55 @@ Use the `fmemory discover` command to navigate the memory hierarchy.
 fmemory discover
 ```
 
-Returns all categories with their schema descriptions (if defined):
+Returns all categories with their schema descriptions, attribute counts, and index counts:
 ```
-- people: People and contacts (key: {name}#{attribute})
-- project: Project structure and conventions (key: {area}#{topic})
-- decisions: Architecture decisions (key: {area}#{decision})
+contacts: People and contacts (3 attributes, 2 indexes)
+project: Project structure and conventions (4 attributes, 1 index)
+decisions: Architectural decisions (4 attributes, 1 index)
 ```
 
 ### Step 2: Drill Into a Category
 
 ```bash
-fmemory discover --category "people"
+fmemory discover --category contacts
 ```
 
-Returns sort key prefixes within that category:
+Returns keys, attributes, and indexes within that category:
 ```
-["toby", "alice", "bob"]
+contacts: People and contacts
 
-Schema: People and contacts
-Key format: {name}#{attribute}
-Examples: ["toby#email", "alice#role"]
+Attributes:
+  name (STRING, required)
+  email (STRING, required)
+  role (STRING)
+
+Indexes:
+  name_idx on name
+  email_idx on email
+
+Keys: alice, bob, carol, toby
 ```
 
 ### Step 3: Read Specific Entries
 
 ```bash
-fmemory recall --category "people" --prefix "toby"
+fmemory recall --category contacts --key toby
 ```
 
-Returns all entries for Toby:
-```json
-[
-  {"category": "people", "key": "toby#email", "content": "toby@example.com"},
-  {"category": "people", "key": "toby#role", "content": "Backend engineer"}
-]
+Returns the structured item with all attributes:
+```
+toby (contacts)
+  Name: Toby
+  Email: toby@example.com
+  Role: backend engineer
 ```
 
 ## Presentation
 
 When presenting browse results to the user:
 
-- Format categories as a readable list with descriptions
-- Show key format and examples from schemas
+- Format categories as a readable list with descriptions, attribute counts, and index counts
+- Show schema attributes and indexes when drilling into a category
 - Offer to drill deeper ("Want to see entries for a specific category?")
 - For large result sets, summarize and offer filtering
 

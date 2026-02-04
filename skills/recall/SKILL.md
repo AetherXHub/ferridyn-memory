@@ -1,31 +1,40 @@
 ---
 name: recall
-description: Retrieve memories from the FerridynDB memory system. Supports precise category+prefix lookups and natural language queries.
+description: Retrieve memories from the FerridynDB memory system. Supports exact lookup, category scan, and natural language queries with index-optimized retrieval.
 ---
 
 # Recall — Retrieve Memories
 
 Use the `fmemory recall` command to retrieve stored knowledge.
 
-## Two Modes
+## Three Modes
 
-### 1. Precise Mode (category + prefix)
+### 1. Exact Lookup (category + key)
 
-When you know exactly what to look for:
-
-```bash
-fmemory recall --category "people" --prefix "toby"
-```
-
-This returns all entries in `people` where the key starts with `toby` (e.g. `toby#email`, `toby#role`, `toby#phone`).
-
-Without a prefix, returns all entries in the category:
+When you know exactly what to retrieve:
 
 ```bash
-fmemory recall --category "project"
+fmemory recall --category contacts --key toby
 ```
 
-### 2. Natural Language Mode (query)
+Returns the full structured item for Toby with all attributes:
+
+```
+toby (contacts)
+  Name: Toby
+  Email: toby@example.com
+  Role: backend engineer
+```
+
+### 2. Category Scan (category only)
+
+List all entries in a category:
+
+```bash
+fmemory recall --category contacts
+```
+
+### 3. Natural Language Query
 
 When the user's request implies memory but doesn't specify a category:
 
@@ -39,26 +48,39 @@ Or use the shorthand:
 fmemory "Toby's email address"
 ```
 
-fmemory sends all known schemas to Claude Haiku, which resolves the query to the right category and prefix. This is the preferred mode for agent-driven memory retrieval.
+fmemory resolves the query using known schemas and secondary indexes. When the query targets an indexed attribute, fmemory uses the secondary index for fast lookups instead of scanning.
 
 ## When to Use Each Mode
 
 | Situation | Mode |
 |-----------|------|
-| User asks "what's Toby's email?" | `query: "Toby's email"` |
-| Hook needs context for a prompt | `query: "{summarized prompt}"` |
-| Agent knows the exact category | `category: "project", prefix: "conventions"` |
-| Listing all entries in a category | `category: "bugs"` |
-| Fallback when query fails | `category` + `prefix` (discover first) |
+| User asks "what's Toby's email?" | `--query "Toby's email"` |
+| Hook needs context for a prompt | `--query "{summarized prompt}"` |
+| Agent knows the exact item | `--category contacts --key toby` |
+| Listing all entries in a category | `--category contacts` |
+| Fallback when query returns nothing | `discover` then exact lookup |
 
 ## Fallback Strategy
 
 If natural language recall returns no results:
 
-1. Run `fmemory discover` (no category) to list all categories
+1. Run `fmemory discover` to list all categories with their schemas and index counts
 2. Pick the most relevant category
-3. Run `fmemory discover --category <cat>` to see key prefixes
-4. Use precise recall with the right prefix
+3. Run `fmemory discover --category <cat>` to see keys, attributes, and indexes
+4. Use exact lookup with `--category` and `--key`
+
+## Prose Output
+
+Results are human-readable by default:
+
+```
+toby (contacts)
+  Name: Toby
+  Email: toby@example.com
+  Role: backend engineer
+```
+
+Use `--json` for machine-readable output when needed by scripts.
 
 ## Usage in Hooks
 
@@ -69,5 +91,5 @@ The `memory-retrieval.mjs` hook automatically calls recall with a natural langua
 Default limit is 20 results. For bulk retrieval, set a higher limit:
 
 ```bash
-fmemory recall --category "project" --limit 100
+fmemory recall --category project --limit 100
 ```

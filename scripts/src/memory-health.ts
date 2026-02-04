@@ -9,11 +9,11 @@ async function main(): Promise<void> {
   let totalEntries = 0;
   let schemasFound = 0;
 
-  // Step 1: Discover all categories
-  let categories: unknown[];
+  // Step 1: Discover all categories (enriched objects)
+  let categories: Array<{ name: string; description?: string; attribute_count?: number; index_count?: number }>;
   try {
     const result = await runCli(["discover"]);
-    categories = Array.isArray(result) ? result : [];
+    categories = Array.isArray(result) ? result as Array<{ name: string; description?: string; attribute_count?: number; index_count?: number }> : [];
   } catch {
     // CLI not available — output error report
     const report: HealthReport = {
@@ -41,26 +41,23 @@ async function main(): Promise<void> {
 
   // Step 2: Check each category
   for (const cat of categories) {
-    const catName = typeof cat === "string" ? cat : String(cat);
+    const catName = cat.name;
 
-    // Get prefixes (which tells us about entries)
-    let prefixes: string[] = [];
+    // Get keys, schema, and indexes via discover --category
+    let catResult: { category: string; keys: string[]; schema?: unknown; indexes?: unknown[] } = {
+      category: catName,
+      keys: [],
+    };
     try {
       const result = await runCli(["discover", "--category", catName]);
-      prefixes = Array.isArray(result) ? result.map((p) => typeof p === "string" ? p : String(p)) : [];
+      catResult = result as typeof catResult;
     } catch {
-      issues.push({ severity: "warning", category: catName, issue: "Failed to discover prefixes" });
+      issues.push({ severity: "warning", category: catName, issue: "Failed to discover category details" });
     }
 
-    // Check schema
-    let hasSchema = false;
-    try {
-      const schemaResult = await runCli(["schema", "--category", catName]);
-      hasSchema = schemaResult != null && schemaResult !== "";
-      if (hasSchema) schemasFound++;
-    } catch {
-      // No schema command or no schema — that's what we're checking
-    }
+    const hasSchema = !!catResult.schema;
+    const hasIndexes = Array.isArray(catResult.indexes) && catResult.indexes.length > 0;
+    if (hasSchema) schemasFound++;
 
     // Count entries by recalling with high limit
     let entryCount = 0;
@@ -88,7 +85,7 @@ async function main(): Promise<void> {
       name: catName,
       entries: entryCount,
       has_schema: hasSchema,
-      prefixes,
+      has_indexes: hasIndexes,
     });
   }
 

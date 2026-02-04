@@ -10,6 +10,11 @@ use std::path::PathBuf;
 /// Table name used for all memories.
 pub const TABLE_NAME: &str = "memories";
 
+// Re-export server types for schema and index operations.
+pub use ferridyn_server::client::{
+    AttributeDefInput, AttributeInfo, IndexInfo, PartitionSchemaInfo, QueryResult,
+};
+
 /// Resolve the socket path from env var or default location.
 pub fn resolve_socket_path() -> PathBuf {
     if let Ok(path) = std::env::var("FERRIDYN_MEMORY_SOCKET") {
@@ -21,6 +26,7 @@ pub fn resolve_socket_path() -> PathBuf {
 }
 
 /// Resolve the database path from env var or default location.
+#[cfg(test)]
 pub fn resolve_db_path() -> PathBuf {
     if let Ok(path) = std::env::var("FERRIDYN_MEMORY_DB") {
         return PathBuf::from(path);
@@ -31,6 +37,7 @@ pub fn resolve_db_path() -> PathBuf {
 }
 
 /// Open or create the database directly and ensure the memories table exists.
+#[cfg(test)]
 pub fn init_db_direct(
     path: &std::path::Path,
 ) -> Result<ferridyn_core::api::FerridynDB, Box<dyn std::error::Error>> {
@@ -49,6 +56,7 @@ pub fn init_db_direct(
 }
 
 /// Create the memories table if it doesn't already exist (direct DB access).
+#[cfg(test)]
 fn ensure_memories_table_direct(
     db: &ferridyn_core::api::FerridynDB,
 ) -> Result<(), ferridyn_core::error::Error> {
