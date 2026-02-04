@@ -7,8 +7,8 @@ use tokio::sync::Mutex;
 use ferridyn_memory::backend::MemoryBackend;
 use ferridyn_memory::llm::{AnthropicClient, LlmClient};
 use ferridyn_memory::schema::{
-    NlIntent, ResolvedQuery, SchemaManager, answer_query, classify_intent, infer_schema,
-    parse_to_document, resolve_query, strip_markdown_fences,
+    NlIntent, PREDEFINED_SCHEMAS, ResolvedQuery, SchemaDefinition, SchemaManager, answer_query,
+    classify_intent, parse_to_document, parse_to_document_with_category, resolve_query,
 };
 use ferridyn_memory::{PartitionSchemaInfo, ensure_memories_table_via_server, resolve_socket_path};
 
@@ -85,46 +85,11 @@ enum Command {
         #[arg(long)]
         category: Option<String>,
     },
-}
-
-// ============================================================================
-// Category Inference
-// ============================================================================
-
-const INFER_CATEGORY_PROMPT: &str = r#"Given a natural language input about something to remember, determine which category it belongs to.
-
-Respond with ONLY a JSON object: {"category": "lowercase-name"}
-
-Available categories (use one if appropriate, or suggest a new one):
-"#;
-
-async fn infer_category(
-    llm: &dyn LlmClient,
-    schemas: &[PartitionSchemaInfo],
-    input: &str,
-) -> Result<String, String> {
-    let mut category_list = String::new();
-    for schema in schemas {
-        category_list.push_str(&format!("- {}: {}\n", schema.prefix, schema.description));
-    }
-    if category_list.is_empty() {
-        category_list.push_str("(none yet — suggest a new category name)\n");
-    }
-
-    let system = format!("{INFER_CATEGORY_PROMPT}{category_list}");
-    let completion = llm
-        .complete(&system, input)
-        .await
-        .map_err(|e| format!("Category inference failed: {e}"))?;
-
-    let cleaned = strip_markdown_fences(completion.text.trim());
-    let parsed: Value =
-        serde_json::from_str(&cleaned).map_err(|e| format!("Failed to parse category: {e}"))?;
-
-    parsed["category"]
-        .as_str()
-        .map(|s| s.to_string())
-        .ok_or_else(|| "LLM response missing 'category' field".to_string())
+    /// Initialize predefined categories and schemas
+    Init {
+        #[arg(long, help = "Recreate schemas even if they already exist")]
+        force: bool,
+    },
 }
 
 // ============================================================================
@@ -388,70 +353,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
 
-            // Resolve category.
-            let category = if let Some(cat) = category {
-                cat
-            } else {
-                let llm = require_llm()?;
-                let schemas = schema_manager.list_schemas().await.unwrap_or_default();
-                infer_category(llm.as_ref(), &schemas, &input_text)
-                    .await
-                    .map_err(|e| format!("Category inference failed: {e}"))?
-            };
+            // Auto-init: ensure predefined schemas exist on first use.
+            auto_init(&backend, &schema_manager).await?;
 
-            // Check if schema exists.
-            let has_schema = schema_manager.has_schema(&category).await.unwrap_or(false);
+            let llm = require_llm()?;
 
-            let (final_key, final_doc) = if !has_schema {
-                // No schema yet: infer one.
-                let llm = require_llm()?;
-                let inferred = infer_schema(llm.as_ref(), &category, &input_text).await;
-                if let Some(ref schema) = inferred {
-                    if let Err(e) = schema_manager
-                        .create_schema_with_indexes(&category, schema, false)
-                        .await
-                    {
-                        eprintln!("warning: Failed to create inferred schema: {e}");
-                    } else {
-                        eprintln!("Inferred schema for '{}': {}", category, schema.description);
-                    }
+            let (category, final_key, final_doc) = if let Some(cat) = category {
+                // Category provided: validate it has a schema.
+                if !schema_manager.has_schema(&cat).await.unwrap_or(false) {
+                    let available: Vec<&str> = PREDEFINED_SCHEMAS.iter().map(|s| s.name).collect();
+                    return Err(format!(
+                        "Unknown category '{cat}'. Available: {}. \
+                         Use `fmemory define` to create custom categories.",
+                        available.join(", ")
+                    )
+                    .into());
                 }
-
-                // After schema creation, try to parse with the new schema.
-                let schema_info = schema_manager.get_schema(&category).await.ok().flatten();
-                if let Some(ref info) = schema_info {
-                    let doc = parse_to_document(llm.as_ref(), &category, info, &input_text)
-                        .await
-                        .map_err(|e| format!("Document parsing failed: {e}"))?;
-                    let parsed_key = doc["key"].as_str().unwrap_or("unknown").to_string();
-                    let used_key = key.unwrap_or(parsed_key);
-                    (used_key, doc)
-                } else {
-                    // Schema creation failed; store as simple content.
-                    let used_key = key.unwrap_or_else(|| "unknown".to_string());
-                    let doc = serde_json::json!({
-                        "content": input_text,
-                    });
-                    (used_key, doc)
-                }
-            } else {
-                // Schema exists: parse to document.
-                let llm = require_llm()?;
                 let schema_info = schema_manager
-                    .get_schema(&category)
+                    .get_schema(&cat)
                     .await
                     .map_err(|e| e.to_string())?
-                    .ok_or_else(|| format!("Schema for '{category}' not found"))?;
+                    .ok_or_else(|| format!("Schema for '{cat}' not found"))?;
 
-                let doc = parse_to_document(llm.as_ref(), &category, &schema_info, &input_text)
+                let doc = parse_to_document(llm.as_ref(), &cat, &schema_info, &input_text)
                     .await
                     .map_err(|e| format!("Document parsing failed: {e}"))?;
                 let parsed_key = doc["key"].as_str().unwrap_or("unknown").to_string();
                 let used_key = key.unwrap_or(parsed_key);
-                (used_key, doc)
+                (cat, used_key, doc)
+            } else {
+                // No category: let LLM pick from available schemas.
+                let schemas = schema_manager.list_schemas().await.unwrap_or_default();
+                let doc = parse_to_document_with_category(llm.as_ref(), &schemas, &input_text)
+                    .await
+                    .map_err(|e| format!("Document parsing failed: {e}"))?;
+                let chosen_cat = doc["category"].as_str().unwrap_or("notes").to_string();
+                let parsed_key = doc["key"].as_str().unwrap_or("unknown").to_string();
+                let used_key = key.unwrap_or(parsed_key);
+                (chosen_cat, used_key, doc)
             };
 
-            // Build final document: merge parsed doc with category and key.
+            // Build final document with category, key, and created_at.
             let mut final_item = serde_json::json!({
                 "category": category,
                 "key": final_key,
@@ -464,6 +406,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     final_item[k] = v.clone();
                 }
             }
+            // Auto-inject created_at timestamp.
+            final_item["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
 
             backend
                 .put_item(final_item.clone())
@@ -475,7 +419,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .as_object()
                 .map(|obj| {
                     obj.iter()
-                        .filter(|(k, v)| *k != "category" && *k != "key" && !v.is_null())
+                        .filter(|(k, v)| {
+                            *k != "category" && *k != "key" && *k != "created_at" && !v.is_null()
+                        })
                         .map(|(k, _)| k.as_str())
                         .collect()
                 })
@@ -510,14 +456,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 vec![]
             };
 
-            let inferred = ferridyn_memory::schema::InferredSchema {
+            let definition = SchemaDefinition {
                 description,
                 attributes: attr_defs,
                 suggested_indexes,
             };
 
             schema_manager
-                .create_schema_with_indexes(&category, &inferred, true)
+                .create_schema_with_indexes(&category, &definition, true)
                 .await
                 .map_err(|e| e.to_string())?;
             eprintln!("Schema defined for '{category}'");
@@ -626,6 +572,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        Some(Command::Init { force }) => {
+            if force {
+                // Drop and recreate all predefined schemas.
+                for predefined in PREDEFINED_SCHEMAS {
+                    let _ = backend.drop_schema(predefined.name).await;
+                    // Also drop associated indexes.
+                    let indexes = schema_manager.list_indexes().await.unwrap_or_default();
+                    for idx in &indexes {
+                        if idx.partition_schema == predefined.name {
+                            let _ = backend.drop_index(&idx.name).await;
+                        }
+                    }
+                }
+            }
+            backend
+                .ensure_predefined_schemas()
+                .await
+                .map_err(|e| e.to_string())?;
+
+            if cli.json {
+                let names: Vec<&str> = PREDEFINED_SCHEMAS.iter().map(|s| s.name).collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "initialized": names,
+                    }))?
+                );
+            } else {
+                eprintln!(
+                    "Initialized {} predefined categories:",
+                    PREDEFINED_SCHEMAS.len()
+                );
+                for s in PREDEFINED_SCHEMAS {
+                    eprintln!("  - {}: {}", s.name, s.description);
+                }
+            }
+        }
         None => {
             let input = match cli.prompt {
                 Some(ref p) => p.clone(),
@@ -643,6 +626,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
             })?;
 
+            // Auto-init predefined schemas.
+            auto_init(&backend, &schema_manager).await?;
+
             // Classify intent: remember or recall.
             let intent = classify_intent(llm.as_ref(), &input)
                 .await
@@ -650,65 +636,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             match intent {
                 NlIntent::Remember { content } => {
-                    // --- Remember flow (mirrors the Remember subcommand) ---
-
-                    // Infer category from content.
+                    // Let LLM pick category from available schemas.
                     let schemas = schema_manager.list_schemas().await.unwrap_or_default();
-                    let category = infer_category(llm.as_ref(), &schemas, &content)
+                    let doc = parse_to_document_with_category(llm.as_ref(), &schemas, &content)
                         .await
-                        .map_err(|e| format!("Category inference failed: {e}"))?;
+                        .map_err(|e| format!("Document parsing failed: {e}"))?;
+                    let category = doc["category"].as_str().unwrap_or("notes").to_string();
+                    let final_key = doc["key"].as_str().unwrap_or("unknown").to_string();
 
-                    // Check if schema exists; infer one if not.
-                    let has_schema = schema_manager.has_schema(&category).await.unwrap_or(false);
-
-                    let (final_key, final_doc) = if !has_schema {
-                        let inferred = infer_schema(llm.as_ref(), &category, &content).await;
-                        if let Some(ref schema) = inferred {
-                            if let Err(e) = schema_manager
-                                .create_schema_with_indexes(&category, schema, false)
-                                .await
-                            {
-                                eprintln!("warning: Failed to create inferred schema: {e}");
-                            } else {
-                                eprintln!(
-                                    "Inferred schema for '{}': {}",
-                                    category, schema.description
-                                );
-                            }
-                        }
-
-                        let schema_info = schema_manager.get_schema(&category).await.ok().flatten();
-                        if let Some(ref info) = schema_info {
-                            let doc = parse_to_document(llm.as_ref(), &category, info, &content)
-                                .await
-                                .map_err(|e| format!("Document parsing failed: {e}"))?;
-                            let parsed_key = doc["key"].as_str().unwrap_or("unknown").to_string();
-                            (parsed_key, doc)
-                        } else {
-                            let doc = serde_json::json!({ "content": content });
-                            ("unknown".to_string(), doc)
-                        }
-                    } else {
-                        let schema_info = schema_manager
-                            .get_schema(&category)
-                            .await
-                            .map_err(|e| e.to_string())?
-                            .ok_or_else(|| format!("Schema for '{category}' not found"))?;
-
-                        let doc =
-                            parse_to_document(llm.as_ref(), &category, &schema_info, &content)
-                                .await
-                                .map_err(|e| format!("Document parsing failed: {e}"))?;
-                        let parsed_key = doc["key"].as_str().unwrap_or("unknown").to_string();
-                        (parsed_key, doc)
-                    };
-
-                    // Build final document.
+                    // Build final document with created_at.
                     let mut final_item = serde_json::json!({
                         "category": category,
                         "key": final_key,
                     });
-                    if let Some(obj) = final_doc.as_object() {
+                    if let Some(obj) = doc.as_object() {
                         for (k, v) in obj {
                             if k == "key" || k == "category" {
                                 continue;
@@ -716,6 +657,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             final_item[k] = v.clone();
                         }
                     }
+                    final_item["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
 
                     backend
                         .put_item(final_item.clone())
@@ -731,7 +673,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .map(|obj| {
                                 obj.iter()
                                     .filter(|(k, v)| {
-                                        *k != "category" && *k != "key" && !v.is_null()
+                                        *k != "category"
+                                            && *k != "key"
+                                            && *k != "created_at"
+                                            && !v.is_null()
                                     })
                                     .map(|(k, _)| k.as_str())
                                     .collect()
@@ -752,10 +697,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .await
                         .map_err(|e| e.to_string())?;
                     if schemas.is_empty() {
-                        eprintln!(
-                            "No schemas defined yet. Store some memories first, \
-                             or use explicit subcommands."
-                        );
+                        eprintln!("No schemas defined yet. Run `fmemory init` first.");
                         std::process::exit(1);
                     }
                     let indexes = schema_manager.list_indexes().await.unwrap_or_default();
@@ -896,6 +838,27 @@ async fn fetch_category_keys(
         result.push((schema.prefix.clone(), keys));
     }
     result
+}
+
+/// Ensure predefined schemas exist. Called transparently on first use.
+///
+/// Only initializes if no schemas exist at all (first use of the database).
+async fn auto_init(
+    backend: &MemoryBackend,
+    schema_manager: &SchemaManager,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let schemas = schema_manager.list_schemas().await.unwrap_or_default();
+    if schemas.is_empty() {
+        backend
+            .ensure_predefined_schemas()
+            .await
+            .map_err(|e| e.to_string())?;
+        eprintln!(
+            "Initialized {} predefined categories.",
+            PREDEFINED_SCHEMAS.len()
+        );
+    }
+    Ok(())
 }
 
 /// Create an LLM client from environment, or error if not available.

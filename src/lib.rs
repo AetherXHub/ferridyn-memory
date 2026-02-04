@@ -15,6 +15,9 @@ pub use ferridyn_server::client::{
     AttributeDefInput, AttributeInfo, IndexInfo, PartitionSchemaInfo, QueryResult,
 };
 
+// Re-export predefined schema types.
+pub use schema::{PREDEFINED_SCHEMAS, PredefinedCategory, SchemaDefinition};
+
 /// Resolve the socket path from env var or default location.
 pub fn resolve_socket_path() -> PathBuf {
     if let Ok(path) = std::env::var("FERRIDYN_MEMORY_SOCKET") {

@@ -1,6 +1,6 @@
 # fmemory — Structured Memory CLI
 
-Persistent, structured memory backed by [FerridynDB](https://github.com/AetherXHub/ferridyndb). Store and retrieve memories with typed attributes and secondary indexes, using Claude Haiku for schema inference, natural language parsing, and query resolution.
+Persistent, structured memory backed by [FerridynDB](https://github.com/AetherXHub/ferridyndb). Store and retrieve memories with typed attributes and secondary indexes, organized into predefined categories. Uses Claude Haiku for natural language parsing and query resolution.
 
 ## Install
 
@@ -21,14 +21,30 @@ ferridyn-server \
   --socket ~/.local/share/ferridyn/server.sock &
 ```
 
-Set `ANTHROPIC_API_KEY` for schema inference and natural language features (see [when it's required](#environment-variables)).
+Set `ANTHROPIC_API_KEY` for natural language features (see [when it's required](#environment-variables)).
+
+## Predefined Categories
+
+fmemory ships with 7 built-in categories that are created automatically on first use. Every item gets a `created_at` timestamp (ISO 8601, UTC) injected automatically.
+
+| Category | Description | Indexed Attributes |
+|----------|-------------|--------------------|
+| `project` | Codebase knowledge — architecture, conventions, gotchas, structure | area, topic |
+| `decisions` | Architectural and design decisions with rationale | domain |
+| `contacts` | People — names, roles, contact info | name, email, role, team |
+| `preferences` | User preferences, workflow patterns, directives | scope |
+| `bugs` | Bug patterns, root causes, fixes, workarounds | area |
+| `tools` | Endpoints, configs, infrastructure, CI/CD, environments | kind, name |
+| `notes` | General-purpose catch-all for anything that doesn't fit elsewhere | topic |
+
+Custom categories can be added with `fmemory define`.
 
 ## Usage
 
 ### Store a memory
 
 ```bash
-# Natural language — schema auto-inferred on first write
+# Natural language — category auto-selected from predefined list
 fmemory remember "Toby is a backend engineer, email toby@example.com"
 
 # With explicit category
@@ -38,9 +54,21 @@ fmemory remember --category contacts "Toby is a backend engineer"
 fmemory remember --category contacts --key toby "backend engineer at Example Corp"
 ```
 
-On first write to a new category, Haiku infers a typed schema (attributes like `name: STRING`, `email: STRING`) and creates secondary indexes automatically. Subsequent writes parse input against the existing schema.
+When `--category` is omitted, Haiku selects the best matching category from the predefined list and parses the input into structured attributes in a single LLM call. When a category is specified, the input is parsed against the existing schema.
 
 Relative dates are resolved automatically — "meeting tomorrow at 3pm" becomes an absolute date.
+
+### Initialize categories
+
+```bash
+# Create all predefined category schemas (idempotent)
+fmemory init
+
+# Recreate all schemas even if they already exist
+fmemory init --force
+```
+
+Initialization happens automatically on first `remember` if no schemas exist. The `init` command is useful for explicit setup or resetting schemas.
 
 ### Retrieve memories
 
@@ -79,17 +107,17 @@ fmemory discover --category contacts --limit 50
 fmemory forget --category contacts --key toby
 ```
 
-### Define a schema explicitly
+### Define a custom schema
 
 ```bash
 fmemory define \
-  --category contacts \
-  --description "People and their contact info" \
-  --attributes '[{"name":"name","type":"STRING","required":true},{"name":"email","type":"STRING","required":false}]' \
+  --category meetings \
+  --description "Meeting notes and action items" \
+  --attributes '[{"name":"attendees","type":"STRING","required":true},{"name":"agenda","type":"STRING","required":false}]' \
   --auto-index
 ```
 
-Attribute types: `STRING`, `NUMBER`, `BOOLEAN`. The `--auto-index` flag creates a secondary index for each attribute. Explicitly defined schemas enforce validation on writes; auto-inferred schemas do not.
+Attribute types: `STRING`, `NUMBER`, `BOOLEAN`. The `--auto-index` flag creates a secondary index for each attribute. Use `define` for categories beyond the 7 predefined ones.
 
 ### View schema
 
@@ -112,16 +140,24 @@ fmemory schema
 
 ### Subcommands
 
+#### `init [--force]`
+
+Create all predefined category schemas and their indexes. Idempotent — skips categories that already exist. With `--force`, drops and recreates all predefined schemas.
+
+Does not require `ANTHROPIC_API_KEY`.
+
 #### `remember [--category CAT] [--key KEY] <input...>`
 
 Store a memory. Input is positional (remaining args joined by space).
 
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
-| `--category` | String | No | Target category. If omitted, Haiku infers one from input. |
+| `--category` | String | No | Target category. Must be a predefined or user-defined category. If omitted, Haiku selects from available categories. |
 | `--key` | String | No | Item key. If omitted, Haiku extracts one from the parsed document. |
 
-Requires `ANTHROPIC_API_KEY` (always — for schema inference or document parsing).
+A `created_at` timestamp (ISO 8601, UTC) is automatically injected into every stored item.
+
+Requires `ANTHROPIC_API_KEY` (always — for document parsing).
 
 #### `recall [--category CAT] [--key KEY] [--query Q] [--limit N]`
 
@@ -153,7 +189,7 @@ Remove a specific memory. Both flags are required. Does not require `ANTHROPIC_A
 
 #### `define --category CAT --description DESC --attributes JSON [--auto-index]`
 
-Explicitly create a category schema with typed attributes. All three main flags are required.
+Create a custom category schema with typed attributes. All three main flags are required.
 
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
@@ -187,12 +223,15 @@ The CLI connects to `ferridyn-server` via Unix socket. The `memories` table uses
 
 ### How schemas work
 
-On first write to a new category, Claude Haiku (`claude-haiku-4-5`) infers a schema:
-1. Analyzes the input to determine typed attributes and suggests secondary indexes
-2. Creates the partition schema and indexes in the database
-3. Parses the input into a structured document matching the schema
+fmemory ships with 7 predefined category schemas codified at compile time. On first use (or via `fmemory init`), these schemas and their secondary indexes are created in the database.
 
-Subsequent writes parse input against the existing schema. Relative dates ("tomorrow", "next week") are resolved to absolute ISO 8601 dates.
+When storing a memory:
+1. If no schemas exist yet, auto-initialization creates all predefined categories
+2. If `--category` is omitted, Haiku selects the best category and parses the input in one call
+3. If `--category` is provided, Haiku parses the input against the existing schema
+4. A `created_at` timestamp is injected before storage
+
+Custom categories can be added via `fmemory define` for use cases not covered by the predefined set.
 
 ### How NL queries work
 
@@ -206,7 +245,7 @@ Natural language queries go through a multi-step resolution:
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ANTHROPIC_API_KEY` | For NL features | Schema inference, NL parsing, query resolution, answer synthesis. Not needed for `discover`, `forget`, `schema`, or `recall --category`. |
+| `ANTHROPIC_API_KEY` | For NL features | NL parsing, query resolution, answer synthesis. Not needed for `init`, `discover`, `forget`, `schema`, or `recall --category`. |
 | `FERRIDYN_MEMORY_SOCKET` | No | Override server socket path (default: `~/.local/share/ferridyn/server.sock`) |
 
 ## Claude Code Plugin
@@ -217,7 +256,7 @@ For Claude Code integration (auto-retrieval hooks, skills, agent behaviors), see
 
 ```bash
 cargo build                       # compile
-cargo test                        # 30 tests
+cargo test                        # 32 tests
 cargo clippy -- -D warnings       # lint
 cargo fmt --check                 # format check
 ```

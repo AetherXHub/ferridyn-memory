@@ -2,9 +2,10 @@
 //!
 //! This module provides:
 //! - [`SchemaManager`] for creating and querying partition schemas and secondary indexes
-//! - [`InferredSchema`] for LLM-based schema inference on first write
+//! - [`PREDEFINED_SCHEMAS`] — 7 built-in category definitions with typed attributes and indexes
+//! - [`SchemaDefinition`] for explicit schema creation (via `define` or predefined init)
 //! - [`ResolvedQuery`] for routing natural language queries to the most efficient query strategy
-//! - LLM-powered functions for schema inference, document parsing, and query resolution
+//! - LLM-powered functions for document parsing and query resolution
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,9 +24,9 @@ pub use ferridyn_server::client::{
 // Types
 // ============================================================================
 
-/// Schema inferred by Haiku on first write to a new category.
+/// Schema definition for explicit creation (via `define` or predefined init).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InferredSchema {
+pub struct SchemaDefinition {
     /// Human-readable description of the category.
     pub description: String,
     /// Typed attributes for items in this category.
@@ -34,7 +35,7 @@ pub struct InferredSchema {
     pub suggested_indexes: Vec<String>,
 }
 
-/// Attribute definition for schema inference.
+/// Attribute definition for a schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeDef {
     pub name: String,
@@ -43,6 +44,313 @@ pub struct AttributeDef {
     pub attr_type: String,
     pub required: bool,
 }
+
+// ============================================================================
+// Predefined Schemas
+// ============================================================================
+
+/// A built-in category definition with compile-time attribute and index data.
+pub struct PredefinedCategory {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub attributes: &'static [StaticAttributeDef],
+    pub indexed_attributes: &'static [&'static str],
+}
+
+/// Compile-time attribute definition for predefined schemas.
+pub struct StaticAttributeDef {
+    pub name: &'static str,
+    pub attr_type: &'static str,
+    pub required: bool,
+}
+
+impl PredefinedCategory {
+    /// Convert to a runtime [`SchemaDefinition`] for database creation.
+    pub fn to_definition(&self) -> SchemaDefinition {
+        SchemaDefinition {
+            description: self.description.to_string(),
+            attributes: self
+                .attributes
+                .iter()
+                .map(|a| AttributeDef {
+                    name: a.name.to_string(),
+                    attr_type: a.attr_type.to_string(),
+                    required: a.required,
+                })
+                .collect(),
+            suggested_indexes: self
+                .indexed_attributes
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+}
+
+/// The 7 predefined memory categories.
+///
+/// Every schema includes `created_at` (STRING, not required) which is auto-injected at write time.
+pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
+    PredefinedCategory {
+        name: "project",
+        description: "Codebase knowledge — architecture, conventions, gotchas, structure",
+        attributes: &[
+            StaticAttributeDef {
+                name: "area",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "topic",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "details",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["area", "topic"],
+    },
+    PredefinedCategory {
+        name: "decisions",
+        description: "Architectural and design decisions with rationale",
+        attributes: &[
+            StaticAttributeDef {
+                name: "title",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "domain",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "decision",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "rationale",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "alternatives",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "constraints",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "supersedes",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["domain"],
+    },
+    PredefinedCategory {
+        name: "contacts",
+        description: "People — names, roles, contact info",
+        attributes: &[
+            StaticAttributeDef {
+                name: "name",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "email",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "role",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "team",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "notes",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["name", "email", "role", "team"],
+    },
+    PredefinedCategory {
+        name: "preferences",
+        description: "User preferences, workflow patterns, directives",
+        attributes: &[
+            StaticAttributeDef {
+                name: "scope",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "preference",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["scope"],
+    },
+    PredefinedCategory {
+        name: "bugs",
+        description: "Bug patterns, root causes, fixes, workarounds",
+        attributes: &[
+            StaticAttributeDef {
+                name: "area",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "symptom",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "cause",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "fix",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "workaround",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "resolved",
+                attr_type: "BOOLEAN",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["area"],
+    },
+    PredefinedCategory {
+        name: "tools",
+        description: "Endpoints, configs, infrastructure, CI/CD, environments",
+        attributes: &[
+            StaticAttributeDef {
+                name: "kind",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "name",
+                attr_type: "STRING",
+                required: true,
+            },
+            StaticAttributeDef {
+                name: "value",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "notes",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["kind", "name"],
+    },
+    PredefinedCategory {
+        name: "notes",
+        description: "General-purpose catch-all for anything that doesn't fit elsewhere",
+        attributes: &[
+            StaticAttributeDef {
+                name: "topic",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["topic"],
+    },
+];
 
 /// Result of resolving a natural language query.
 #[derive(Debug, Clone)]
@@ -128,17 +436,17 @@ impl SchemaManager {
         self.backend.list_schemas().await
     }
 
-    /// Create a partition schema and secondary indexes from an inferred schema.
+    /// Create a partition schema and secondary indexes from a schema definition.
     ///
     /// When `validate` is true, the server will reject writes that don't conform
-    /// to the schema. Use false for auto-inferred schemas (best-effort).
+    /// to the schema. Use false for predefined schemas (lenient).
     pub async fn create_schema_with_indexes(
         &self,
         category: &str,
-        inferred: &InferredSchema,
+        definition: &SchemaDefinition,
         validate: bool,
     ) -> Result<(), MemoryError> {
-        let attrs: Vec<AttributeDefInput> = inferred
+        let attrs: Vec<AttributeDefInput> = definition
             .attributes
             .iter()
             .map(|a| AttributeDefInput {
@@ -149,12 +457,12 @@ impl SchemaManager {
             .collect();
 
         self.backend
-            .create_schema(category, Some(&inferred.description), &attrs, validate)
+            .create_schema(category, Some(&definition.description), &attrs, validate)
             .await?;
 
         // Create indexes for suggested attributes.
-        for attr_name in &inferred.suggested_indexes {
-            if let Some(attr) = inferred.attributes.iter().find(|a| &a.name == attr_name) {
+        for attr_name in &definition.suggested_indexes {
+            if let Some(attr) = definition.attributes.iter().find(|a| &a.name == attr_name) {
                 let index_name = format!("{category}_{attr_name}");
                 if let Err(e) = self
                     .backend
@@ -187,60 +495,6 @@ impl SchemaManager {
 }
 
 // ============================================================================
-// LLM-Powered Schema Inference
-// ============================================================================
-
-const INFER_SCHEMA_PROMPT: &str = r#"You are a schema inference engine for a structured memory system. Given a category name and natural language input about what will be stored, infer the schema.
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{
-  "description": "Human-readable description of what this category stores",
-  "attributes": [
-    {"name": "attribute_name", "type": "STRING", "required": true},
-    ...
-  ],
-  "suggested_indexes": ["attribute_name_worth_indexing", ...]
-}
-
-Rules:
-- Attribute types must be one of: STRING, NUMBER, BOOLEAN
-- Mark attributes as required only if they will ALWAYS be present in every item
-- Suggest indexes for attributes commonly used in lookups (e.g. email, name)
-- Keep attribute names lowercase with underscores
-- Include 3-6 relevant DOMAIN attributes based on the category and input
-- Do NOT include "category", "key", or any metadata attributes — those are handled automatically
-- Focus on content attributes (e.g. for appointments: date, time, location, description, doctor_name)
-- Do NOT include attributes like "category_name", "category_type", "item_type" — those are system-level"#;
-
-/// Infer a schema from the first write to a category.
-///
-/// Returns `None` if inference fails (never blocks writes).
-pub async fn infer_schema(
-    llm: &dyn LlmClient,
-    category: &str,
-    input: &str,
-) -> Option<InferredSchema> {
-    let user_msg = format!("Category: {category}\nInput: {input}");
-
-    match llm.complete(INFER_SCHEMA_PROMPT, &user_msg).await {
-        Ok(completion) => {
-            let cleaned = strip_markdown_fences(completion.text.trim());
-            match serde_json::from_str::<InferredSchema>(&cleaned) {
-                Ok(schema) => Some(schema),
-                Err(e) => {
-                    warn!("Failed to parse inferred schema: {e}");
-                    None
-                }
-            }
-        }
-        Err(e) => {
-            warn!("Schema inference LLM call failed: {e}");
-            None
-        }
-    }
-}
-
-// ============================================================================
 // LLM-Powered Document Parsing
 // ============================================================================
 
@@ -262,6 +516,31 @@ Rules:
 - For NUMBER attributes: use numeric values
 - For BOOLEAN attributes: use true/false
 - Keep values concise but complete
+- Do NOT include "created_at" — that is handled automatically
+- IMPORTANT: Resolve all relative dates and times to absolute values using the provided current date. "tomorrow" → actual date, "next week" → actual date, "in 3 days" → actual date. Use ISO 8601 format (YYYY-MM-DD) for dates and 24h format (HH:MM) for times."#;
+
+const PARSE_WITH_CATEGORY_PROMPT: &str = r#"You are a document parser for a structured memory system. Given a set of available categories and natural language input, pick the best category and extract a structured JSON document.
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{
+  "category": "chosen-category-name",
+  "key": "short-identifier-for-this-item",
+  "attribute1": "value1",
+  "attribute2": "value2",
+  ...
+}
+
+Rules:
+- "category" MUST be one of the available categories listed below — never invent a new one
+- "key" must be a short, lowercase, hyphenated identifier (e.g. "toby", "auth-method", "ferridyndb")
+- Extract values for the CHOSEN category's schema attributes from the input text
+- Use null for attributes not mentioned in the input
+- For STRING attributes: use plain text values
+- For NUMBER attributes: use numeric values
+- For BOOLEAN attributes: use true/false
+- Keep values concise but complete
+- Do NOT include "created_at" — that is handled automatically
+- If the input doesn't fit any category well, use "notes" as the fallback
 - IMPORTANT: Resolve all relative dates and times to absolute values using the provided current date. "tomorrow" → actual date, "next week" → actual date, "in 3 days" → actual date. Use ISO 8601 format (YYYY-MM-DD) for dates and 24h format (HH:MM) for times."#;
 
 /// Parse natural language input into a structured document using the schema.
@@ -274,6 +553,7 @@ pub async fn parse_to_document(
     let attrs_desc: Vec<String> = schema
         .attributes
         .iter()
+        .filter(|a| a.name != "created_at")
         .map(|a| {
             format!(
                 "  - {} ({}{})",
@@ -292,6 +572,53 @@ pub async fn parse_to_document(
     );
 
     let completion = llm.complete(PARSE_DOCUMENT_PROMPT, &user_msg).await?;
+    let cleaned = strip_markdown_fences(completion.text.trim());
+
+    serde_json::from_str(&cleaned).map_err(|e| {
+        LlmError::Parse(format!(
+            "Failed to parse document: {e}\nResponse: {}",
+            completion.text
+        ))
+    })
+}
+
+/// Parse natural language input, letting the LLM pick the best category from available schemas.
+///
+/// Returns a JSON document that includes a `"category"` field chosen by the LLM.
+pub async fn parse_to_document_with_category(
+    llm: &dyn LlmClient,
+    schemas: &[PartitionSchemaInfo],
+    input: &str,
+) -> Result<Value, LlmError> {
+    let mut categories_desc = String::new();
+    for schema in schemas {
+        let attrs: Vec<String> = schema
+            .attributes
+            .iter()
+            .filter(|a| a.name != "created_at")
+            .map(|a| {
+                format!(
+                    "    - {} ({}{})",
+                    a.name,
+                    a.attr_type,
+                    if a.required { ", required" } else { "" }
+                )
+            })
+            .collect();
+        categories_desc.push_str(&format!(
+            "\nCategory: {}\n  Description: {}\n  Attributes:\n{}\n",
+            schema.prefix,
+            schema.description,
+            attrs.join("\n")
+        ));
+    }
+
+    let today = chrono::Local::now().format("%Y-%m-%d (%A)");
+    let user_msg = format!(
+        "Today's date: {today}\n\nAvailable categories:{categories_desc}\n\nInput: {input}"
+    );
+
+    let completion = llm.complete(PARSE_WITH_CATEGORY_PROMPT, &user_msg).await?;
     let cleaned = strip_markdown_fences(completion.text.trim());
 
     serde_json::from_str(&cleaned).map_err(|e| {
@@ -591,41 +918,65 @@ mod tests {
         assert_eq!(strip_markdown_fences("```\nfoo\n```"), "foo");
     }
 
-    // --- infer_schema ---
+    // --- predefined schemas ---
 
-    #[tokio::test]
-    async fn test_infer_schema_success() {
-        let mock = MockLlmClient::new(vec![
-            r#"{"description":"People and contacts","attributes":[{"name":"name","type":"STRING","required":true},{"name":"email","type":"STRING","required":true},{"name":"role","type":"STRING","required":false}],"suggested_indexes":["email"]}"#.into(),
-        ]);
-
-        let result = infer_schema(
-            &mock,
-            "contacts",
-            "Toby is a backend engineer, email toby@example.com",
-        )
-        .await;
-        let schema = result.unwrap();
-        assert_eq!(schema.description, "People and contacts");
-        assert_eq!(schema.attributes.len(), 3);
-        assert_eq!(schema.suggested_indexes, vec!["email"]);
+    #[test]
+    fn test_predefined_schemas_count() {
+        assert_eq!(PREDEFINED_SCHEMAS.len(), 7);
     }
 
-    #[tokio::test]
-    async fn test_infer_schema_bad_json_returns_none() {
-        let mock = MockLlmClient::new(vec!["not valid json".into()]);
-        let result = infer_schema(&mock, "contacts", "some input").await;
-        assert!(result.is_none());
+    #[test]
+    fn test_predefined_schemas_have_created_at() {
+        for schema in PREDEFINED_SCHEMAS {
+            assert!(
+                schema
+                    .attributes
+                    .iter()
+                    .any(|a| a.name == "created_at" && a.attr_type == "STRING" && !a.required),
+                "Category '{}' missing created_at attribute",
+                schema.name
+            );
+        }
     }
 
-    #[tokio::test]
-    async fn test_infer_schema_with_markdown_fences() {
-        let mock = MockLlmClient::new(vec![
-            "```json\n{\"description\":\"People\",\"attributes\":[{\"name\":\"name\",\"type\":\"STRING\",\"required\":true}],\"suggested_indexes\":[\"name\"]}\n```".into(),
-        ]);
+    #[test]
+    fn test_predefined_schemas_have_content() {
+        for schema in PREDEFINED_SCHEMAS {
+            assert!(
+                schema
+                    .attributes
+                    .iter()
+                    .any(|a| a.name == "content" && a.attr_type == "STRING"),
+                "Category '{}' missing content attribute",
+                schema.name
+            );
+        }
+    }
 
-        let result = infer_schema(&mock, "contacts", "Toby").await;
-        assert!(result.is_some());
+    #[test]
+    fn test_predefined_schema_to_definition() {
+        let notes = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "notes")
+            .unwrap();
+        let def = notes.to_definition();
+        assert_eq!(def.description, notes.description);
+        assert_eq!(def.attributes.len(), notes.attributes.len());
+        assert_eq!(def.suggested_indexes.len(), notes.indexed_attributes.len());
+    }
+
+    #[test]
+    fn test_predefined_indexed_attributes_exist() {
+        for schema in PREDEFINED_SCHEMAS {
+            for idx_attr in schema.indexed_attributes {
+                assert!(
+                    schema.attributes.iter().any(|a| a.name == *idx_attr),
+                    "Category '{}' indexes '{}' which is not in its attributes",
+                    schema.name,
+                    idx_attr
+                );
+            }
+        }
     }
 
     // --- parse_to_document ---

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
+use crate::schema::{PREDEFINED_SCHEMAS, SchemaManager};
 use serde_json::Value;
 use tokio::sync::Mutex;
 
@@ -298,6 +299,23 @@ impl MemoryBackend {
                 .await
                 .map_err(|e| MemoryError::Index(e.to_string())),
         }
+    }
+
+    /// Create all predefined schemas and their indexes if they don't already exist.
+    ///
+    /// Idempotent — skips categories that already have schemas.
+    /// Called by `fmemory init` and auto-init on first `remember`.
+    pub async fn ensure_predefined_schemas(&self) -> Result<(), MemoryError> {
+        let sm = SchemaManager::new(self.clone());
+        for predefined in PREDEFINED_SCHEMAS {
+            if sm.has_schema(predefined.name).await? {
+                continue;
+            }
+            let definition = predefined.to_definition();
+            sm.create_schema_with_indexes(predefined.name, &definition, false)
+                .await?;
+        }
+        Ok(())
     }
 
     pub async fn query_index(
