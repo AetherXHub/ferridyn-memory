@@ -22,6 +22,10 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// Natural language prompt (remember or recall via intent classification)
+    #[arg(short, long)]
+    prompt: Option<String>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -177,17 +181,7 @@ fn capitalize_first(s: &str) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = match Cli::try_parse() {
-        Ok(cli) => cli,
-        Err(e) if e.kind() == clap::error::ErrorKind::InvalidSubcommand => {
-            // Unrecognized subcommand — fall through to NL mode.
-            Cli {
-                json: std::env::args().any(|a| a == "--json"),
-                command: None,
-            }
-        }
-        Err(e) => e.exit(),
-    };
+    let cli = Cli::parse();
     let backend = connect_backend().await?;
     let schema_manager = SchemaManager::new(backend.clone());
 
@@ -356,13 +350,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let indexes = schema_manager.list_indexes().await.unwrap_or_default();
 
                 let category_keys = fetch_category_keys(&backend, &schemas).await;
-                let resolved =
-                    resolve_query(llm.as_ref(), &schemas, &indexes, &category_keys, q)
-                        .await
-                        .map_err(|e| format!("Query resolution failed: {e}"))?;
+                let resolved = resolve_query(llm.as_ref(), &schemas, &indexes, &category_keys, q)
+                    .await
+                    .map_err(|e| format!("Query resolution failed: {e}"))?;
 
-                let (items, _) =
-                    execute_with_fallback(&backend, &resolved, limit).await?;
+                let (items, _) = execute_with_fallback(&backend, &resolved, limit).await?;
 
                 if cli.json {
                     println!("{}", serde_json::to_string_pretty(&items)?);
@@ -635,18 +627,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         None => {
-            // NL-first mode: treat remaining args as natural language.
-            let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--json").collect();
+            let input = match cli.prompt {
+                Some(ref p) => p.clone(),
+                None => {
+                    Cli::parse_from(["fmemory", "--help"]);
+                    return Ok(());
+                }
+            };
 
-            if args.is_empty() {
-                Cli::parse_from(["fmemory", "--help"]);
-                return Ok(());
-            }
-
-            let input = args.join(" ");
             let llm = require_llm().map_err(|e| {
                 format!(
-                    "{e}\n\nNatural language mode requires ANTHROPIC_API_KEY. \
+                    "{e}\n\n-p/--prompt requires ANTHROPIC_API_KEY. \
                      Use explicit subcommands (discover, recall, remember, ...) \
                      for API-key-free operation."
                 )
@@ -775,8 +766,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .await
                             .map_err(|e| format!("Query resolution failed: {e}"))?;
 
-                    let (items, _) =
-                        execute_with_fallback(&backend, &resolved, 20).await?;
+                    let (items, _) = execute_with_fallback(&backend, &resolved, 20).await?;
 
                     if cli.json {
                         println!("{}", serde_json::to_string_pretty(&items)?);
@@ -857,7 +847,13 @@ async fn execute_with_fallback(
     }
 
     // Already a full category scan — no broader fallback possible.
-    if matches!(resolved, ResolvedQuery::PartitionScan { key_prefix: None, .. }) {
+    if matches!(
+        resolved,
+        ResolvedQuery::PartitionScan {
+            key_prefix: None,
+            ..
+        }
+    ) {
         return Ok((items, false));
     }
 

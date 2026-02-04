@@ -38,10 +38,10 @@ Use natural language recall for broad context:
 fmemory recall --query "authentication conventions and decisions"
 ```
 
-Or use the shorthand:
+Or use the `-p` flag for natural language:
 
 ```bash
-fmemory "authentication conventions and decisions"
+fmemory -p "authentication conventions and decisions"
 ```
 
 Or use exact lookup if you know the category and key:

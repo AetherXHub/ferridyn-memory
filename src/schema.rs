@@ -533,9 +533,8 @@ pub async fn answer_query(
     let items_json = serde_json::to_string_pretty(items).unwrap_or_default();
     let today = chrono::Local::now().format("%Y-%m-%d (%A)");
 
-    let user_msg = format!(
-        "Today's date: {today}\n\nQuestion: {query}\n\nRetrieved items:\n{items_json}"
-    );
+    let user_msg =
+        format!("Today's date: {today}\n\nQuestion: {query}\n\nRetrieved items:\n{items_json}");
 
     let completion = llm.complete(ANSWER_QUERY_PROMPT, &user_msg).await?;
     let text = completion.text.trim().to_string();
@@ -806,7 +805,9 @@ mod tests {
             validate: false,
         }];
 
-        let result = resolve_query(&mock, &schemas, &[], &[], "toby").await.unwrap();
+        let result = resolve_query(&mock, &schemas, &[], &[], "toby")
+            .await
+            .unwrap();
         match result {
             ResolvedQuery::PartitionScan {
                 category,

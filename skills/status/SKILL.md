@@ -80,7 +80,7 @@ Based on what's in memory, suggest:
 Sometimes you just need to know if a specific topic is stored, not a full overview:
 
 ```bash
-fmemory "database configuration"
+fmemory -p "database configuration"
 ```
 
 If results come back -> topic is covered.

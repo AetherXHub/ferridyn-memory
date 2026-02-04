@@ -42,10 +42,10 @@ When the user's request implies memory but doesn't specify a category:
 fmemory recall --query "Toby's email address"
 ```
 
-Or use the shorthand:
+Or use the `-p` flag for natural language:
 
 ```bash
-fmemory "Toby's email address"
+fmemory -p "Toby's email address"
 ```
 
 fmemory resolves the query using known schemas and secondary indexes. When the query targets an indexed attribute, fmemory uses the secondary index for fast lookups instead of scanning.

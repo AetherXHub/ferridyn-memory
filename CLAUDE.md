@@ -17,7 +17,7 @@ Claude Code sessions are ephemeral — knowledge is lost when conversations end 
 - `npm run build:all` — build scripts + Rust binaries (full build)
 - `cargo build` — compile the plugin (fmemory CLI)
 - `cargo build --release` — release build (required for plugin deployment)
-- `cargo test` — run all tests (25 tests)
+- `cargo test` — run all tests (30 tests)
 - `cargo clippy -- -D warnings` — lint
 - `cargo fmt --check` — check formatting
 
@@ -44,7 +44,7 @@ Each memory category can have a native partition schema with typed attributes an
 
 ### CLI Commands
 
-The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
+The `fmemory` CLI provides 6 subcommands plus a `-p` flag for natural language prompts:
 
 | Command | Purpose |
 |---------|---------|
@@ -54,7 +54,7 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 | `forget` | Remove a specific memory by category and key |
 | `define` | Explicitly define or update a category's schema with typed attributes |
 | `schema` | View schema for a category (attributes, indexes) |
-| NL-first mode | `fmemory "natural language query"` — resolves to recall |
+| `-p` prompt | `fmemory -p "natural language"` — classifies intent and routes to remember or recall |
 
 ### Hooks (3)
 
@@ -95,7 +95,7 @@ src/
   llm.rs       — LlmClient trait + AnthropicClient (Claude Haiku) + MockLlmClient for tests
   backend.rs   — MemoryBackend: server-only (FerridynClient), schema/index creation methods
   lib.rs       — Shared: socket path resolution, table initialization, env var handling
-  cli.rs       — fmemory binary: NL-first writes, index-optimized reads, prose output, --json flag
+  cli.rs       — fmemory binary: -p prompt mode, subcommands, index-optimized reads, prose output, --json flag
   error.rs     — Error types
 ```
 
@@ -140,6 +140,6 @@ This crate depends on `ferridyn-server` from the [ferridyndb](https://github.com
 
 1. **Build scripts** — `npm run build:scripts` must produce 5 `.mjs` files in `scripts/dist/`
 2. **Build Rust** — `cargo build` must pass
-3. **Test** — `cargo test` must pass (25 tests covering schema inference, LLM mocking, CLI command handlers, backend operations)
+3. **Test** — `cargo test` must pass (30 tests covering schema inference, LLM mocking, CLI command handlers, backend operations)
 4. **Lint** — `cargo clippy -- -D warnings` must pass
 5. **Format** — `cargo fmt --check` must pass

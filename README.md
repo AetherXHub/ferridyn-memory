@@ -4,7 +4,7 @@ Persistent, structured memory for Claude Code backed by [FerridynDB](https://git
 
 ## What It Does
 
-- **CLI interface** — `fmemory` command with 6 subcommands plus natural-language-first mode available to Claude via Bash
+- **CLI interface** — `fmemory` command with 6 subcommands plus `-p` prompt flag for natural language, available to Claude via Bash
 - **3 hooks** — auto-retrieve context before each prompt, save learnings before compaction, reflect on sessions at exit
 - **13 skills** — proactive agent behaviors (teach, reflect, context, update, decide, status) plus core workflows (setup, remember, recall, forget, browse, learn, health)
 - **Structured data with native schemas** — Claude Haiku auto-infers typed attributes and secondary indexes on first write, parses NL input, and resolves queries via indexes
@@ -51,7 +51,7 @@ Each category can have a native partition schema with typed attributes and secon
 
 ## CLI Commands
 
-The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
+The `fmemory` CLI provides 6 subcommands plus a `-p` flag for natural language prompts:
 
 | Command | Purpose |
 |---------|---------|
@@ -61,7 +61,7 @@ The `fmemory` CLI provides 6 commands plus a natural-language-first mode:
 | `forget` | Remove a specific memory by category and key |
 | `define` | Explicitly define or update a category's schema with typed attributes |
 | `schema` | View schema for a category (attributes, indexes) |
-| NL-first mode | `fmemory "natural language query"` — resolves to recall |
+| `-p` prompt | `fmemory -p "natural language"` — classifies intent and routes to remember or recall |
 
 ## Hooks
 
@@ -111,7 +111,7 @@ src/
   schema.rs           — SchemaManager: schema inference, NL parsing, query resolution
   llm.rs              — LLM client (Claude Haiku) + mock for tests
   backend.rs          — MemoryBackend: server-only (FerridynClient), schema/index methods
-  cli.rs              — fmemory binary: NL-first writes, index-optimized reads, prose output
+  cli.rs              — fmemory binary: -p prompt mode, subcommands, index-optimized reads, prose output
   lib.rs              — Shared utilities
 scripts/
   src/                — TypeScript source (compiled by tsup)
@@ -135,7 +135,7 @@ hooks/hooks.json      — Hook configuration
 npm install                       # install tsup + typescript
 npm run build:scripts             # compile TypeScript hooks to scripts/dist/
 cargo build                       # compile Rust binaries
-cargo test                        # run tests (25 tests)
+cargo test                        # run tests (30 tests)
 cargo clippy -- -D warnings       # lint
 cargo fmt --check                 # check formatting
 ```
