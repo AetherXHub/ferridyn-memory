@@ -8,7 +8,7 @@ pub mod ttl;
 
 use std::path::PathBuf;
 
-/// Table name used for all memories.
+/// Default table name used for all memories (no namespace).
 pub const TABLE_NAME: &str = "memories";
 
 // Re-export server types for schema and index operations.
@@ -24,6 +24,17 @@ pub use ttl::{
     INTERACTIONS_DEFAULT_TTL, SCRATCHPAD_DEFAULT_TTL, SESSIONS_DEFAULT_TTL, auto_ttl_from_date,
     compute_expires_at, filter_expired, is_expired, parse_ttl,
 };
+
+/// Resolve the table name from an optional namespace.
+///
+/// - `None` → `"memories"` (backward compatible default)
+/// - `Some("myproject")` → `"memories_myproject"`
+pub fn resolve_table_name(namespace: Option<&str>) -> String {
+    match namespace {
+        Some(ns) => format!("memories_{ns}"),
+        None => TABLE_NAME.to_string(),
+    }
+}
 
 /// Resolve the socket path from env var or default location.
 pub fn resolve_socket_path() -> PathBuf {
@@ -61,7 +72,7 @@ pub fn init_db_direct(
         ferridyn_core::api::FerridynDB::create(path)?
     };
 
-    ensure_memories_table_direct(&db)?;
+    ensure_memories_table_direct(&db, TABLE_NAME)?;
     Ok(db)
 }
 
@@ -69,11 +80,12 @@ pub fn init_db_direct(
 #[cfg(test)]
 fn ensure_memories_table_direct(
     db: &ferridyn_core::api::FerridynDB,
+    table_name: &str,
 ) -> Result<(), ferridyn_core::error::Error> {
     use ferridyn_core::types::KeyType;
 
     match db
-        .create_table(TABLE_NAME)
+        .create_table(table_name)
         .partition_key("category", KeyType::String)
         .sort_key("key", KeyType::String)
         .execute()
@@ -89,12 +101,13 @@ fn ensure_memories_table_direct(
 /// Ensure the memories table exists via a server client.
 pub async fn ensure_memories_table_via_server(
     client: &mut ferridyn_server::FerridynClient,
+    table_name: &str,
 ) -> Result<(), ferridyn_server::error::ClientError> {
     use ferridyn_server::protocol::KeyDef;
 
     match client
         .create_table(
-            TABLE_NAME,
+            table_name,
             KeyDef {
                 name: "category".to_string(),
                 key_type: "String".to_string(),

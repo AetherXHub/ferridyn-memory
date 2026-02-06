@@ -14,7 +14,9 @@ use ferridyn_memory::ttl::{
     INTERACTIONS_DEFAULT_TTL, SCRATCHPAD_DEFAULT_TTL, SESSIONS_DEFAULT_TTL, auto_ttl_from_date,
     compute_expires_at, filter_expired, is_expired, parse_ttl,
 };
-use ferridyn_memory::{PartitionSchemaInfo, ensure_memories_table_via_server, resolve_socket_path};
+use ferridyn_memory::{
+    PartitionSchemaInfo, ensure_memories_table_via_server, resolve_socket_path, resolve_table_name,
+};
 
 #[derive(Parser)]
 #[command(
@@ -33,6 +35,10 @@ struct Cli {
     /// Include expired items in results (debug)
     #[arg(long, global = true)]
     include_expired: bool,
+
+    /// Namespace for memory isolation (table prefix)
+    #[arg(long, global = true)]
+    namespace: Option<String>,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -171,7 +177,15 @@ fn capitalize_first(s: &str) -> String {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let backend = connect_backend().await?;
+
+    // Resolve namespace: --namespace flag > FMEMORY_NAMESPACE env var > default.
+    let namespace = cli
+        .namespace
+        .clone()
+        .or_else(|| std::env::var("FMEMORY_NAMESPACE").ok());
+    let table_name = resolve_table_name(namespace.as_deref());
+
+    let backend = connect_backend(&table_name).await?;
     let schema_manager = SchemaManager::new(backend.clone());
 
     match cli.command {
@@ -1116,7 +1130,7 @@ fn require_llm() -> Result<Arc<dyn LlmClient>, String> {
 }
 
 /// Connect to the ferridyn-server socket. Errors if the server is not available.
-async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> {
+async fn connect_backend(table_name: &str) -> Result<MemoryBackend, Box<dyn std::error::Error>> {
     let socket_path = resolve_socket_path();
 
     if !socket_path.exists() {
@@ -1135,6 +1149,9 @@ async fn connect_backend() -> Result<MemoryBackend, Box<dyn std::error::Error>> 
                 socket_path.display()
             )
         })?;
-    ensure_memories_table_via_server(&mut client).await?;
-    Ok(MemoryBackend::Server(Arc::new(Mutex::new(client))))
+    ensure_memories_table_via_server(&mut client, table_name).await?;
+    Ok(MemoryBackend::server(
+        Arc::new(Mutex::new(client)),
+        table_name.to_string(),
+    ))
 }
