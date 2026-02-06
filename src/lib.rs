@@ -21,8 +21,8 @@ pub use schema::{PREDEFINED_SCHEMAS, PredefinedCategory, SchemaDefinition};
 
 // Re-export TTL utilities.
 pub use ttl::{
-    SCRATCHPAD_DEFAULT_TTL, auto_ttl_from_date, compute_expires_at, filter_expired, is_expired,
-    parse_ttl,
+    INTERACTIONS_DEFAULT_TTL, SCRATCHPAD_DEFAULT_TTL, SESSIONS_DEFAULT_TTL, auto_ttl_from_date,
+    compute_expires_at, filter_expired, is_expired, parse_ttl,
 };
 
 /// Resolve the socket path from env var or default location.

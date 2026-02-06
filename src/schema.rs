@@ -2,7 +2,7 @@
 //!
 //! This module provides:
 //! - [`SchemaManager`] for creating and querying partition schemas and secondary indexes
-//! - [`PREDEFINED_SCHEMAS`] — 7 built-in category definitions with typed attributes and indexes
+//! - [`PREDEFINED_SCHEMAS`] — 15 built-in category definitions with typed attributes and indexes
 //! - [`SchemaDefinition`] for explicit schema creation (via `define` or predefined init)
 //! - [`ResolvedQuery`] for routing natural language queries to the most efficient query strategy
 //! - LLM-powered functions for document parsing and query resolution
@@ -87,7 +87,7 @@ impl PredefinedCategory {
     }
 }
 
-/// The 9 predefined memory categories.
+/// The 15 predefined memory categories.
 ///
 /// Every schema includes `expires_at` and `created_at` (STRING, not required) which are auto-injected at write time.
 pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
@@ -448,6 +448,330 @@ pub static PREDEFINED_SCHEMAS: &[PredefinedCategory] = &[
             },
         ],
         indexed_attributes: &["topic"],
+    },
+    // -- Coding Agent Categories --
+    PredefinedCategory {
+        name: "sessions",
+        description: "Working context for multi-session tasks (7d default TTL)",
+        attributes: &[
+            StaticAttributeDef {
+                name: "project",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "branch",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "goal",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "status",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "blockers",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "files_touched",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "last_active",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["project", "status"],
+    },
+    PredefinedCategory {
+        name: "errors",
+        description: "Error patterns and their resolutions",
+        attributes: &[
+            StaticAttributeDef {
+                name: "signature",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "language",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "cause",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "fix",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "frequency",
+                attr_type: "NUMBER",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "last_seen",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "confidence",
+                attr_type: "NUMBER",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["signature", "language"],
+    },
+    PredefinedCategory {
+        name: "architecture",
+        description: "Codebase structural knowledge",
+        attributes: &[
+            StaticAttributeDef {
+                name: "component",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "pattern",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "files",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "dependencies",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "constraints",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "last_verified",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["component", "pattern"],
+    },
+    PredefinedCategory {
+        name: "snippets",
+        description: "Reusable code patterns",
+        attributes: &[
+            StaticAttributeDef {
+                name: "language",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "purpose",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "code",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "imports",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "usage",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["language", "purpose"],
+    },
+    // -- Personal Assistant Agent Categories --
+    PredefinedCategory {
+        name: "tasks",
+        description: "Commitments and action items",
+        attributes: &[
+            StaticAttributeDef {
+                name: "title",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "status",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "due_date",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "assigned_to",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "source",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "priority",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "notes",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["status", "due_date", "assigned_to", "priority"],
+    },
+    PredefinedCategory {
+        name: "interactions",
+        description: "Conversation and meeting summaries (90d default TTL)",
+        attributes: &[
+            StaticAttributeDef {
+                name: "date",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "participants",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "summary",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "action_items",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "sentiment",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "source",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "content",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "expires_at",
+                attr_type: "STRING",
+                required: false,
+            },
+            StaticAttributeDef {
+                name: "created_at",
+                attr_type: "STRING",
+                required: false,
+            },
+        ],
+        indexed_attributes: &["date", "source"],
     },
 ];
 
@@ -1021,7 +1345,7 @@ mod tests {
 
     #[test]
     fn test_predefined_schemas_count() {
-        assert_eq!(PREDEFINED_SCHEMAS.len(), 9);
+        assert_eq!(PREDEFINED_SCHEMAS.len(), 15);
     }
 
     #[test]
@@ -1131,6 +1455,87 @@ mod tests {
             events.attributes.iter().any(|a| a.name == "time"),
             "events must have a 'time' attribute"
         );
+    }
+
+    // --- new categories ---
+
+    #[test]
+    fn test_sessions_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "sessions")
+            .expect("sessions category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.attributes.len(), cat.attributes.len());
+        assert_eq!(def.suggested_indexes.len(), 2);
+        assert!(cat.attributes.iter().any(|a| a.name == "project"));
+        assert!(cat.attributes.iter().any(|a| a.name == "status"));
+    }
+
+    #[test]
+    fn test_errors_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "errors")
+            .expect("errors category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.suggested_indexes.len(), 2);
+        assert!(cat.attributes.iter().any(|a| a.name == "signature"));
+        assert!(
+            cat.attributes
+                .iter()
+                .any(|a| a.name == "frequency" && a.attr_type == "NUMBER")
+        );
+    }
+
+    #[test]
+    fn test_architecture_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "architecture")
+            .expect("architecture category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.suggested_indexes.len(), 2);
+        assert!(cat.attributes.iter().any(|a| a.name == "component"));
+        assert!(cat.attributes.iter().any(|a| a.name == "dependencies"));
+    }
+
+    #[test]
+    fn test_snippets_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "snippets")
+            .expect("snippets category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.suggested_indexes.len(), 2);
+        assert!(cat.attributes.iter().any(|a| a.name == "code"));
+        assert!(cat.attributes.iter().any(|a| a.name == "language"));
+    }
+
+    #[test]
+    fn test_tasks_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "tasks")
+            .expect("tasks category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.suggested_indexes.len(), 4);
+        assert!(cat.attributes.iter().any(|a| a.name == "title"));
+        assert!(cat.attributes.iter().any(|a| a.name == "due_date"));
+        assert!(cat.attributes.iter().any(|a| a.name == "priority"));
+    }
+
+    #[test]
+    fn test_interactions_category() {
+        let cat = PREDEFINED_SCHEMAS
+            .iter()
+            .find(|s| s.name == "interactions")
+            .expect("interactions category must exist");
+        let def = cat.to_definition();
+        assert_eq!(def.suggested_indexes.len(), 2);
+        assert!(cat.attributes.iter().any(|a| a.name == "participants"));
+        assert!(cat.attributes.iter().any(|a| a.name == "summary"));
+        assert!(cat.attributes.iter().any(|a| a.name == "date"));
     }
 
     #[test]

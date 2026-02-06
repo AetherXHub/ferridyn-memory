@@ -10,6 +10,12 @@ use serde_json::Value;
 /// Default TTL for scratchpad items: 24 hours.
 pub const SCRATCHPAD_DEFAULT_TTL: Duration = Duration::hours(24);
 
+/// Default TTL for sessions items: 7 days.
+pub const SESSIONS_DEFAULT_TTL: Duration = Duration::days(7);
+
+/// Default TTL for interactions items: 90 days.
+pub const INTERACTIONS_DEFAULT_TTL: Duration = Duration::days(90);
+
 /// Parse a TTL duration string into a [`chrono::Duration`].
 ///
 /// Supported formats:

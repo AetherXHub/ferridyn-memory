@@ -11,8 +11,8 @@ use ferridyn_memory::schema::{
     classify_intent, parse_to_document, parse_to_document_with_category, resolve_query,
 };
 use ferridyn_memory::ttl::{
-    SCRATCHPAD_DEFAULT_TTL, auto_ttl_from_date, compute_expires_at, filter_expired, is_expired,
-    parse_ttl,
+    INTERACTIONS_DEFAULT_TTL, SCRATCHPAD_DEFAULT_TTL, SESSIONS_DEFAULT_TTL, auto_ttl_from_date,
+    compute_expires_at, filter_expired, is_expired, parse_ttl,
 };
 use ferridyn_memory::{PartitionSchemaInfo, ensure_memories_table_via_server, resolve_socket_path};
 
@@ -458,6 +458,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else if category == "scratchpad" {
                 final_item["expires_at"] =
                     Value::String(compute_expires_at(SCRATCHPAD_DEFAULT_TTL));
+            } else if category == "sessions" {
+                final_item["expires_at"] = Value::String(compute_expires_at(SESSIONS_DEFAULT_TTL));
+            } else if category == "interactions" {
+                final_item["expires_at"] =
+                    Value::String(compute_expires_at(INTERACTIONS_DEFAULT_TTL));
             } else if category == "events"
                 && let Some(expires) = auto_ttl_from_date(&final_item)
             {
@@ -879,10 +884,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     final_item["created_at"] = Value::String(chrono::Utc::now().to_rfc3339());
 
-                    // Auto-inject expires_at for scratchpad or events.
+                    // Auto-inject expires_at for categories with default TTLs.
                     if category == "scratchpad" {
                         final_item["expires_at"] =
                             Value::String(compute_expires_at(SCRATCHPAD_DEFAULT_TTL));
+                    } else if category == "sessions" {
+                        final_item["expires_at"] =
+                            Value::String(compute_expires_at(SESSIONS_DEFAULT_TTL));
+                    } else if category == "interactions" {
+                        final_item["expires_at"] =
+                            Value::String(compute_expires_at(INTERACTIONS_DEFAULT_TTL));
                     } else if category == "events"
                         && let Some(expires) = auto_ttl_from_date(&final_item)
                     {
