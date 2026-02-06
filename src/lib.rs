@@ -3,6 +3,7 @@
 pub mod backend;
 pub mod error;
 pub mod llm;
+pub mod mcp;
 pub mod schema;
 pub mod ttl;
 

@@ -120,6 +120,11 @@ enum Command {
         #[arg(long, help = "Only prune this category")]
         category: Option<String>,
     },
+    /// Start MCP server on stdio transport
+    Serve {
+        #[arg(long, help = "Namespace for this server instance")]
+        namespace: Option<String>,
+    },
 }
 
 // ============================================================================
@@ -847,6 +852,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 eprintln!("Pruned {total_pruned} expired memories.");
             }
+        }
+        Some(Command::Serve {
+            namespace: serve_ns,
+        }) => {
+            // Use serve-specific namespace, falling back to global namespace.
+            let ns = serve_ns.or(namespace);
+            ferridyn_memory::mcp::run_mcp_server(backend, ns).await?;
         }
         None => {
             let input = match cli.prompt {
